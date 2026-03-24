@@ -157,7 +157,7 @@ tr:hover td { background: #FAFAF8; }
 <body>
 
 <!-- SETUP SCREEN -->
-<div id="setup-screen">
+<div id="setup-screen" style="display:none;">
   <div class="setup-card">
     <h1>CSM Leistungsübersicht</h1>
     <p>Einmalige Einrichtung – danach funktioniert die App wie normale Software für dein ganzes Team.</p>
@@ -216,7 +216,7 @@ tr:hover td { background: #FAFAF8; }
 </div>
 
 <!-- MAIN APP -->
-<div id="app">
+<div id="app" style="display:block;">
   <div class="topbar">
     <div class="topbar-logo">CSM <span>Leistungsübersicht</span></div>
     <div class="topbar-spacer"></div>
@@ -379,19 +379,18 @@ const ANTHROPIC_KEY_PLACEHOLDER = 'YOUR_ANTHROPIC_KEY'; // wird über API-Proxy 
 let sbClient = null;
 let allData = [];
 
-// Load saved config
-window.addEventListener('load', () => {
-  const url = localStorage.getItem('sb_url');
-  const key = localStorage.getItem('sb_key');
-  if (url && key) {
-    document.getElementById('sb-url').value = url;
-    document.getElementById('sb-key').value = key;
-    const okey = localStorage.getItem('openai_key');
-    if (okey) document.getElementById('openai-key').value = okey;
-    initApp(url, key);
+const SUPABASE_URL = 'HIER_DEINE_SUPABASE_URL';
+const SUPABASE_KEY = 'HIER_DEIN_PUBLISHABLE_ODER_ANON_KEY';
+
+window.addEventListener('load', async () => {
+  try {
+    await initApp(https://exsrtfiocqleaqqvcffq.supabase.co, sb_publishable_p76MwAWrCDPsshtZ9O4btw_N8ETuJmz);
+  } catch (e) {
+    console.error(e);
+    alert('Verbindung zu Supabase fehlgeschlagen: ' + e.message);
   }
 });
-
+  
 async function connectSupabase() {
   const url = document.getElementById('sb-url').value.trim();
   const key = document.getElementById('sb-key').value.trim();
