@@ -1,43 +1,845 @@
+
 <!DOCTYPE html>
 <html lang="de">
 <head>
-  <meta charset="UTF-8">
-  <title>Contract Check</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CSM Leistungsübersicht</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<style>
+:root {
+  --bg: #F7F6F2;
+  --surface: #FFFFFF;
+  --surface2: #F0EEE8;
+  --border: #E2DED6;
+  --border2: #CCC8BE;
+  --text: #1A1916;
+  --text2: #6B6860;
+  --text3: #9E9B93;
+  --accent: #1A1916;
+  --accent-fg: #F7F6F2;
+  --green: #2D6A4F;
+  --green-bg: #D8F3DC;
+  --amber: #7B5E1A;
+  --amber-bg: #FFF3CD;
+  --red: #7B2020;
+  --red-bg: #FFE0E0;
+  --blue: #1A4A7B;
+  --blue-bg: #E0EEFF;
+  --radius: 8px;
+  --radius-lg: 12px;
+  --shadow: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; font-size: 14px; }
+
+/* Setup Screen */
+#setup-screen { display: flex; align-items: center; justify-content: center; min-height: 100vh; padding: 2rem; }
+.setup-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 2.5rem; max-width: 520px; width: 100%; box-shadow: var(--shadow); }
+.setup-card h1 { font-size: 22px; font-weight: 600; margin-bottom: 6px; }
+.setup-card p { color: var(--text2); line-height: 1.6; margin-bottom: 1.5rem; font-size: 14px; }
+.setup-step { background: var(--surface2); border-radius: var(--radius); padding: 1rem 1.25rem; margin-bottom: 10px; border-left: 3px solid var(--accent); }
+.setup-step strong { font-size: 13px; font-weight: 600; display: block; margin-bottom: 4px; }
+.setup-step span { font-size: 13px; color: var(--text2); }
+.setup-step code { font-family: 'DM Mono', monospace; font-size: 12px; background: var(--border); padding: 1px 5px; border-radius: 3px; color: var(--text); }
+.setup-inputs { margin-top: 1.5rem; display: flex; flex-direction: column; gap: 10px; }
+.setup-inputs label { font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 3px; display: block; }
+.setup-inputs input { width: 100%; padding: 9px 12px; border: 1px solid var(--border2); border-radius: var(--radius); font-family: 'DM Mono', monospace; font-size: 12px; background: var(--surface); color: var(--text); outline: none; }
+.setup-inputs input:focus { border-color: var(--accent); }
+.btn-primary { background: var(--accent); color: var(--accent-fg); border: none; border-radius: var(--radius); padding: 10px 20px; font-family: 'DM Sans', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; width: 100%; margin-top: 1rem; transition: opacity 0.15s; }
+.btn-primary:hover { opacity: 0.85; }
+.setup-error { color: var(--red); font-size: 13px; margin-top: 8px; }
+
+/* Main App */
+#app { display: none; }
+.topbar { background: var(--surface); border-bottom: 1px solid var(--border); padding: 0 2rem; height: 56px; display: flex; align-items: center; gap: 16px; position: sticky; top: 0; z-index: 100; }
+.topbar-logo { font-size: 15px; font-weight: 600; letter-spacing: -0.3px; }
+.topbar-logo span { color: var(--text3); font-weight: 300; }
+.topbar-spacer { flex: 1; }
+.topbar-btn { background: none; border: 1px solid var(--border2); border-radius: var(--radius); padding: 6px 14px; font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; color: var(--text); display: flex; align-items: center; gap: 6px; transition: background 0.12s; }
+.topbar-btn:hover { background: var(--surface2); }
+.topbar-btn.primary { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.topbar-btn.primary:hover { opacity: 0.85; }
+.topbar-user { font-size: 12px; color: var(--text3); }
+
+.main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+
+.stats-row { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin-bottom: 1.5rem; }
+.stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); padding: 1.25rem 1.5rem; box-shadow: var(--shadow); }
+.stat-label { font-size: 11px; font-weight: 500; color: var(--text3); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 6px; }
+.stat-value { font-size: 28px; font-weight: 600; letter-spacing: -0.5px; }
+.stat-sub { font-size: 11px; color: var(--text3); margin-top: 3px; }
+
+.toolbar { display: flex; align-items: center; gap: 10px; margin-bottom: 1rem; flex-wrap: wrap; }
+.toolbar input[type=text] { padding: 8px 12px; border: 1px solid var(--border2); border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 13px; background: var(--surface); color: var(--text); outline: none; width: 200px; }
+.toolbar input:focus { border-color: var(--accent); }
+.toolbar select { padding: 8px 10px; border: 1px solid var(--border2); border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 13px; background: var(--surface); color: var(--text); outline: none; cursor: pointer; }
+.toolbar-spacer { flex: 1; }
+
+.table-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-lg); box-shadow: var(--shadow); overflow: hidden; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+thead th { background: var(--surface2); color: var(--text2); font-weight: 500; padding: 10px 14px; text-align: left; border-bottom: 1px solid var(--border); font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; cursor: pointer; user-select: none; }
+thead th:hover { color: var(--text); }
+td { padding: 12px 14px; border-bottom: 1px solid var(--border); vertical-align: top; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: #FAFAF8; }
+.td-kunde { font-weight: 500; font-size: 13px; min-width: 180px; }
+.td-kunde small { font-weight: 400; color: var(--text3); font-size: 11px; display: block; margin-top: 2px; font-family: 'DM Mono', monospace; }
+.tag { display: inline-block; background: var(--surface2); border: 1px solid var(--border); border-radius: 4px; padding: 2px 7px; font-size: 11px; margin: 2px 2px 2px 0; color: var(--text2); }
+.badge { display: inline-block; padding: 3px 9px; border-radius: 999px; font-size: 11px; font-weight: 500; }
+.badge-ok { background: var(--green-bg); color: var(--green); }
+.badge-warn { background: var(--amber-bg); color: var(--amber); }
+.badge-danger { background: var(--red-bg); color: var(--red); }
+.badge-info { background: var(--blue-bg); color: var(--blue); }
+.mono { font-family: 'DM Mono', monospace; font-size: 12px; }
+.td-actions { white-space: nowrap; }
+.btn-icon { background: none; border: none; cursor: pointer; color: var(--text3); padding: 4px 6px; border-radius: 4px; font-size: 13px; transition: color 0.1s, background 0.1s; }
+.btn-icon:hover { color: var(--text); background: var(--surface2); }
+.btn-icon.del:hover { color: var(--red); }
+
+/* Modal */
+.modal-bg { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.35); z-index: 200; align-items: center; justify-content: center; padding: 1rem; }
+.modal-bg.open { display: flex; }
+.modal { background: var(--surface); border-radius: var(--radius-lg); padding: 2rem; max-width: 540px; width: 100%; box-shadow: 0 20px 40px rgba(0,0,0,0.12); max-height: 90vh; overflow-y: auto; }
+.modal h3 { font-size: 17px; font-weight: 600; margin-bottom: 1.25rem; }
+.form-group { margin-bottom: 14px; }
+.form-group label { font-size: 12px; font-weight: 500; color: var(--text2); margin-bottom: 4px; display: block; }
+.form-group input, .form-group textarea, .form-group select { width: 100%; padding: 8px 10px; border: 1px solid var(--border2); border-radius: var(--radius); font-family: 'DM Sans', sans-serif; font-size: 13px; background: var(--surface); color: var(--text); outline: none; resize: vertical; }
+.form-group input:focus, .form-group textarea:focus { border-color: var(--accent); }
+.form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 1.5rem; }
+.btn-sec { background: none; border: 1px solid var(--border2); border-radius: var(--radius); padding: 8px 18px; font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; color: var(--text); }
+.btn-sec:hover { background: var(--surface2); }
+
+/* Upload zone */
+.upload-zone { border: 2px dashed var(--border2); border-radius: var(--radius-lg); padding: 2rem; text-align: center; cursor: pointer; transition: all 0.15s; margin-bottom: 1rem; }
+.upload-zone:hover, .upload-zone.drag { border-color: var(--accent); background: var(--surface2); }
+.upload-zone p { color: var(--text2); font-size: 13px; margin-top: 6px; }
+.upload-zone .icon { font-size: 24px; }
+.upload-progress { font-size: 13px; color: var(--text2); text-align: center; padding: 8px; }
+
+.empty-state { text-align: center; padding: 4rem 2rem; color: var(--text3); }
+.empty-state .big { font-size: 32px; margin-bottom: 12px; }
+.empty-state p { font-size: 14px; }
+
+.notify { position: fixed; bottom: 1.5rem; right: 1.5rem; background: var(--accent); color: var(--accent-fg); border-radius: var(--radius); padding: 10px 18px; font-size: 13px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); z-index: 999; opacity: 0; transform: translateY(8px); transition: all 0.2s; pointer-events: none; }
+.notify.show { opacity: 1; transform: translateY(0); }
+.tabs { display: flex; gap: 0; border-bottom: 1px solid var(--border); margin-bottom: 1.5rem; }
+.tab-btn { background: none; border: none; border-bottom: 2px solid transparent; padding: 10px 20px; font-family: "DM Sans", sans-serif; font-size: 13px; font-weight: 500; cursor: pointer; color: var(--text2); margin-bottom: -1px; transition: color 0.15s; }
+.tab-btn:hover { color: var(--text); }
+.tab-btn.active { color: var(--text); border-bottom-color: var(--accent); }
+.tab-content { display: none; }
+.tab-content.active { display: block; }
+.matrix-wrap { overflow-x: auto; border: 1px solid var(--border); border-radius: var(--radius-lg); background: var(--surface); }
+.matrix-table { border-collapse: collapse; font-size: 12px; min-width: 100%; }
+.matrix-table th { background: var(--surface2); padding: 8px 12px; border: 1px solid var(--border); font-weight: 500; font-size: 11px; text-transform: uppercase; letter-spacing: 0.4px; color: var(--text2); white-space: nowrap; }
+.matrix-table th.kunde-col { min-width: 180px; text-align: left; position: sticky; left: 0; z-index: 2; background: var(--surface2); }
+.matrix-table td { padding: 8px 12px; border: 1px solid var(--border); text-align: center; vertical-align: middle; }
+.matrix-table td.kunde-name { text-align: left; font-weight: 500; font-size: 12px; position: sticky; left: 0; background: var(--surface); z-index: 1; }
+.matrix-table td.kunde-name small { display: block; font-weight: 400; color: var(--text3); font-size: 11px; }
+.matrix-check { color: var(--green); font-size: 16px; }
+.matrix-empty { color: var(--border2); font-size: 14px; }
+.leistung-filter { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 1rem; align-items: center; }
+.leistung-filter span { font-size: 12px; color: var(--text2); }
+.filter-tag { background: var(--surface2); border: 1px solid var(--border2); border-radius: 999px; padding: 4px 12px; font-size: 12px; cursor: pointer; color: var(--text2); transition: all 0.12s; }
+.filter-tag.active { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+
+@media (max-width: 768px) {
+  .stats-row { grid-template-columns: 1fr 1fr; }
+  .main { padding: 1rem; }
+  .topbar { padding: 0 1rem; }
+}
+</style>
 </head>
 <body>
 
-<h1>Kundenliste</h1>
-<ul id="liste"></ul>
+<!-- SETUP SCREEN -->
+<div id="setup-screen">
+  <div class="setup-card">
+    <h1>CSM Leistungsübersicht</h1>
+    <p>Einmalige Einrichtung – danach funktioniert die App wie normale Software für dein ganzes Team.</p>
 
-<script type="module">
-  import { createClient } from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js/+esm'
+    <div class="setup-step">
+      <strong>Schritt 1 – Supabase Projekt erstellen</strong>
+      <span>Gehe zu <code>supabase.com</code> → "Start for free" → Neues Projekt erstellen. Wähle Region <code>eu-central-1</code> (Frankfurt).</span>
+    </div>
+    <div class="setup-step">
+      <strong>Schritt 2 – Tabelle anlegen</strong>
+      <span>Im Supabase Dashboard: <code>SQL Editor</code> → "New query" → folgenden SQL-Code einfügen und ausführen:</span>
+    </div>
+    <div style="background:var(--surface2);border-radius:var(--radius);padding:10px 14px;margin-bottom:10px;font-family:'DM Mono',monospace;font-size:11px;color:var(--text2);line-height:1.7;border:1px solid var(--border);">
+      create table kunden (<br>
+      &nbsp;&nbsp;id uuid default gen_random_uuid() primary key,<br>
+      &nbsp;&nbsp;created_at timestamptz default now(),<br>
+      &nbsp;&nbsp;kunde text not null,<br>
+      &nbsp;&nbsp;angebotsnr text,<br>
+      &nbsp;&nbsp;angebotsdatum text,<br>
+      &nbsp;&nbsp;vertragsbeginn text,<br>
+      &nbsp;&nbsp;laufzeit text,<br>
+      &nbsp;&nbsp;laufzeit_monate int,<br>
+      &nbsp;&nbsp;verlaengerung text,<br>
+      &nbsp;&nbsp;vertragsende_iso text,<br>
+      &nbsp;&nbsp;invest_pa numeric,<br>
+      &nbsp;&nbsp;invest_label text,<br>
+      &nbsp;&nbsp;leistungen jsonb,<br>
+      &nbsp;&nbsp;notiz text<br>
+      );<br>
+      alter table kunden enable row level security;<br>
+      create policy "allow_all" on kunden for all using (true) with check (true);
+    </div>
+    <div class="setup-step">
+      <strong>Schritt 3 – API-Keys einfügen</strong>
+      <span>Im Supabase Dashboard: <code>Project Settings → API</code> → URL und anon key kopieren.</span>
+    </div>
 
-  const supabaseUrl = 'https://exsrtfiocqleaqqvcffq.supabase.co'
-  const supabaseKey = 'sb_publishable_p76MwAWrCDPsshtZ9O4btw_N8ETuJmz'
+    <div class="setup-inputs">
+      <div>
+        <label>Supabase Project URL</label>
+        <input type="text" id="sb-url" placeholder="https://xxxxxxxxxxxx.supabase.co">
+      </div>
+      <div>
+        <label>Supabase Anon Key</label>
+        <input type="text" id="sb-key" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+      </div>
+      <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+        <label>OpenAI API Key (für PDF-Analyse)</label>
+        <input type="password" id="openai-key" placeholder="sk-...">
+        <span style="font-size:11px;color:var(--text3);margin-top:4px;display:block">Wird lokal gespeichert – kein Kollege sieht ihn.</span>
+      </div>
+    </div>
+    <div class="setup-error" id="setup-error"></div>
+    <button class="btn-primary" onclick="connectSupabase()">Verbinden & starten →</button>
+  </div>
+</div>
 
-  const supabase = createClient(supabaseUrl, supabaseKey)
+<!-- MAIN APP -->
+<div id="app">
+  <div class="topbar">
+    <div class="topbar-logo">CSM <span>Leistungsübersicht</span></div>
+    <div class="topbar-spacer"></div>
+    <span class="topbar-user" id="conn-indicator">● Verbunden</span>
+    <button class="topbar-btn" onclick="openSettings()" title="API Key ändern">⚙ Key</button>
+    <button class="topbar-btn" onclick="openManualModal()">+ Manuell hinzufügen</button>
+    <label class="topbar-btn primary" style="cursor:pointer">
+      ↑ PDF hochladen
+      <input type="file" accept=".pdf" multiple style="display:none" onchange="handleUpload(this)">
+    </label>
+  </div>
 
-  async function ladeDaten() {
-    const { data, error } = await supabase
-      .from('kunden')
-      .select('*')
+  <div class="main">
+    <div class="tabs">
+      <button class="tab-btn active" onclick="switchTab('liste')">Kundenübersicht</button>
+      <button class="tab-btn" onclick="switchTab('matrix')">Leistungsmatrix</button>
+    </div>
 
-    if (error) {
-      console.error(error)
-      return
-    }
+    <div id="tab-liste" class="tab-content active">
+    <div class="stats-row">
+      <div class="stat-card"><div class="stat-label">Kunden</div><div class="stat-value" id="s-kunden">—</div></div>
+      <div class="stat-card"><div class="stat-label">Leistungen</div><div class="stat-value" id="s-leistungen">—</div></div>
+      <div class="stat-card"><div class="stat-label">Bald ablaufend</div><div class="stat-value" id="s-ablauf" style="color:var(--amber)">—</div><div class="stat-sub">≤ 90 Tage</div></div>
+      <div class="stat-card"><div class="stat-label">Jahres-Invest (gesamt)</div><div class="stat-value" id="s-invest">—</div></div>
+    </div>
 
-    const liste = document.getElementById('liste')
+    <div class="toolbar">
+      <input type="text" id="search" placeholder="🔍 Kunde suchen..." oninput="renderTable()">
+      <select id="filter-status" onchange="renderTable()">
+        <option value="">Alle Status</option>
+        <option value="Aktiv">Aktiv</option>
+        <option value="Läuft bald ab">Läuft bald ab</option>
+        <option value="Abgelaufen">Abgelaufen</option>
+        <option value="Unbekannt">Datum unbekannt</option>
+      </select>
+      <select id="sort-col" onchange="renderTable()">
+        <option value="kunde">Sortierung: Kunde A–Z</option>
+        <option value="ende">Sortierung: Vertragsende</option>
+        <option value="invest">Sortierung: Invest ↓</option>
+        <option value="created">Sortierung: Zuletzt hinzugefügt</option>
+      </select>
+      <div class="toolbar-spacer"></div>
+      <button class="topbar-btn" onclick="exportCSV()">↓ Export CSV</button>
+    </div>
 
-    data.forEach(kunde => {
-      const li = document.createElement('li')
-      li.textContent = kunde.kunde
-      liste.appendChild(li)
-    })
+    <div class="table-card">
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Kunde</th>
+              <th>Leistungen</th>
+              <th>Angebotsdatum</th>
+              <th>Vertragsbeginn</th>
+              <th>Laufzeit</th>
+              <th>Vertragsende</th>
+              <th>Invest p.a.</th>
+              <th>Status</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="tbody"></tbody>
+        </table>
+      </div>
+    </div>
+    </div><!-- end tab-liste -->
+
+    <div id="tab-matrix" class="tab-content">
+      <div class="leistung-filter" id="leistung-filter">
+        <span>Filter:</span>
+        <button class="filter-tag active" onclick="toggleLeistungFilter('alle', this)">Alle Leistungen</button>
+      </div>
+      <div class="matrix-wrap">
+        <table class="matrix-table" id="matrix-table">
+          <thead id="matrix-head"></thead>
+          <tbody id="matrix-body"></tbody>
+        </table>
+      </div>
+    </div><!-- end tab-matrix -->
+
+  </div>
+</div>
+
+<!-- UPLOAD PROGRESS MODAL -->
+<div class="modal-bg" id="upload-modal">
+  <div class="modal">
+    <h3>PDF wird analysiert</h3>
+    <div class="upload-progress" id="upload-status">Lese PDF...</div>
+    <div style="margin-top:1rem;background:var(--surface2);border-radius:var(--radius);height:4px;overflow:hidden">
+      <div id="upload-bar" style="height:100%;background:var(--accent);width:0%;transition:width 0.3s"></div>
+    </div>
+  </div>
+</div>
+
+<!-- MANUAL ENTRY MODAL -->
+<div class="modal-bg" id="manual-modal">
+  <div class="modal">
+    <h3 id="modal-title">Kunde manuell hinzufügen</h3>
+    <input type="hidden" id="edit-id">
+    <div class="form-group">
+      <label>Kundenname *</label>
+      <input type="text" id="f-kunde" placeholder="z.B. Muster GmbH">
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Angebotsnummer</label>
+        <input type="text" id="f-nr" placeholder="z.B. MUS-001-2026">
+      </div>
+      <div class="form-group">
+        <label>Angebotsdatum</label>
+        <input type="text" id="f-datum" placeholder="TT.MM.JJJJ">
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Vertragsbeginn</label>
+        <input type="text" id="f-beginn" placeholder="z.B. 01.01.2026">
+      </div>
+      <div class="form-group">
+        <label>Laufzeit</label>
+        <select id="f-laufzeit">
+          <option value="12 Monate">12 Monate</option>
+          <option value="24 Monate">24 Monate</option>
+          <option value="36 Monate">36 Monate</option>
+          <option value="6 Monate">6 Monate</option>
+        </select>
+      </div>
+    </div>
+    <div class="form-row">
+      <div class="form-group">
+        <label>Vertragsende (ISO: JJJJ-MM-TT)</label>
+        <input type="date" id="f-ende">
+      </div>
+      <div class="form-group">
+        <label>Jahres-Invest (€)</label>
+        <input type="number" id="f-invest" placeholder="z.B. 75000">
+      </div>
+    </div>
+    <div class="form-group">
+      <label>Leistungen (eine pro Zeile)</label>
+      <textarea id="f-leistungen" rows="4" placeholder="Smile Analytics&#10;Human Powered Insights&#10;Retail Media Proof of Performance"></textarea>
+    </div>
+    <div class="form-group">
+      <label>Notiz</label>
+      <input type="text" id="f-notiz" placeholder="Optionale Zusatzinfo">
+    </div>
+    <div class="modal-actions">
+      <button class="btn-sec" onclick="closeModal('manual-modal')">Abbrechen</button>
+      <button class="btn-primary" style="width:auto" onclick="saveManual()">Speichern</button>
+    </div>
+  </div>
+</div>
+
+<!-- NOTIFICATION -->
+<div class="notify" id="notify"></div>
+
+<script>
+const ANTHROPIC_KEY_PLACEHOLDER = 'YOUR_ANTHROPIC_KEY'; // wird über API-Proxy des Browsers genutzt
+
+let sbClient = null;
+let allData = [];
+
+// Load saved config
+window.addEventListener('load', () => {
+  const url = localStorage.getItem('sb_url');
+  const key = localStorage.getItem('sb_key');
+  if (url && key) {
+    document.getElementById('sb-url').value = url;
+    document.getElementById('sb-key').value = key;
+    const okey = localStorage.getItem('openai_key');
+    if (okey) document.getElementById('openai-key').value = okey;
+    initApp(url, key);
+  }
+});
+
+async function connectSupabase() {
+  const url = document.getElementById('sb-url').value.trim();
+  const key = document.getElementById('sb-key').value.trim();
+  const err = document.getElementById('setup-error');
+  const btn = document.querySelector('.btn-primary');
+
+  if (!url || !key) { err.textContent = 'Bitte beide Felder ausfüllen.'; return; }
+  if (!url.startsWith('https://')) { err.textContent = 'URL muss mit https:// beginnen.'; return; }
+
+  if (!window.supabase) {
+    err.textContent = 'Supabase-Bibliothek konnte nicht geladen werden. Bitte prüfe deine Internetverbindung und lade die Seite neu (F5).';
+    return;
   }
 
-  ladeDaten()
-</script>
+  err.textContent = '';
+  btn.textContent = 'Verbinde...';
+  btn.disabled = true;
 
+  try {
+    await initApp(url, key);
+    localStorage.setItem('sb_url', url);
+    localStorage.setItem('sb_key', key);
+    const okey = document.getElementById('openai-key').value.trim();
+    if (okey) localStorage.setItem('openai_key', okey);
+  } catch(e) {
+    err.textContent = 'Verbindung fehlgeschlagen: ' + e.message + ' – Bitte URL und Key prüfen.';
+    btn.textContent = 'Verbinden & starten →';
+    btn.disabled = false;
+  }
+}
+
+async function initApp(url, key) {
+  sbClient = window.supabase.createClient(url, key);
+  const { data, error } = await sbClient.from('kunden').select('id').limit(1);
+  if (error) throw new Error(error.message);
+  document.getElementById('setup-screen').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  await loadData();
+}
+
+async function loadData() {
+  const { data, error } = await sbClient.from('kunden').select('*').order('created_at', { ascending: false });
+  if (error) { showNotify('Fehler beim Laden: ' + error.message); return; }
+  allData = data || [];
+  renderTable();
+  updateStats();
+}
+
+function getStatus(row) {
+  if (!row.vertragsende_iso) return { label: 'Unbekannt', cls: 'badge-info' };
+  const diff = (new Date(row.vertragsende_iso) - new Date()) / 86400000;
+  if (diff < 0) return { label: 'Abgelaufen', cls: 'badge-danger' };
+  if (diff <= 90) return { label: 'Läuft bald ab', cls: 'badge-warn' };
+  return { label: 'Aktiv', cls: 'badge-ok' };
+}
+
+function fmtDate(iso) {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  return d.toLocaleDateString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric' });
+}
+
+function fmtEuro(v) {
+  if (!v) return '—';
+  return Number(v).toLocaleString('de-DE') + ' €';
+}
+
+function renderTable() {
+  const q = (document.getElementById('search').value || '').toLowerCase();
+  const fs = document.getElementById('filter-status').value;
+  const sc = document.getElementById('sort-col').value;
+
+  let rows = allData.filter(r => {
+    if (q && !r.kunde.toLowerCase().includes(q)) return false;
+    if (fs && getStatus(r).label !== fs) return false;
+    return true;
+  });
+
+  rows.sort((a, b) => {
+    if (sc === 'kunde') return a.kunde.localeCompare(b.kunde, 'de');
+    if (sc === 'ende') {
+      const ad = a.vertragsende_iso || '9999-12-31';
+      const bd = b.vertragsende_iso || '9999-12-31';
+      return ad.localeCompare(bd);
+    }
+    if (sc === 'invest') return (b.invest_pa || 0) - (a.invest_pa || 0);
+    return 0;
+  });
+
+  const tbody = document.getElementById('tbody');
+  if (!rows.length) {
+    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state"><div class="big">📋</div><p>Noch keine Kunden. PDF hochladen oder manuell hinzufügen.</p></div></td></tr>`;
+    return;
+  }
+
+  tbody.innerHTML = rows.map(r => {
+    const st = getStatus(r);
+    const leistungen = (r.leistungen || []);
+    const tags = leistungen.map(l => `<span class="tag">${l}</span>`).join('');
+    const invest = r.invest_label || fmtEuro(r.invest_pa);
+    const ende = r.vertragsende_iso ? fmtDate(r.vertragsende_iso) : '—';
+    const laufzeit = r.laufzeit || '—';
+    const verlaengerung = r.verlaengerung ? `<span style="font-size:11px;color:var(--text3);display:block;margin-top:2px">+${r.verlaengerung} Auto</span>` : '';
+    return `<tr>
+      <td class="td-kunde">${r.kunde}<small class="mono">${r.angebotsnr || ''}</small></td>
+      <td>${tags || '<span style="color:var(--text3)">—</span>'}</td>
+      <td style="white-space:nowrap;color:var(--text2);font-size:12px">${r.angebotsdatum || '—'}</td>
+      <td style="white-space:nowrap">
+        <span class="editable-beginn" onclick="editBeginn('${r.id}', this)" title="Klicken zum Bearbeiten" style="cursor:pointer;border-bottom:1px dashed var(--border2);padding-bottom:1px">${r.vertragsbeginn || '— klicken'}</span>
+      </td>
+      <td>${laufzeit}${verlaengerung}</td>
+      <td style="white-space:nowrap">${ende}</td>
+      <td style="white-space:nowrap;font-weight:500">${invest}</td>
+      <td><span class="badge ${st.cls}">${st.label}</span></td>
+      <td class="td-actions">
+        <button class="btn-icon" onclick="openEditModal('${r.id}')" title="Bearbeiten">✏️</button>
+        <button class="btn-icon del" onclick="deleteRow('${r.id}')" title="Löschen">🗑</button>
+      </td>
+    </tr>`;
+  }).join('');
+}
+
+function updateStats() {
+  document.getElementById('s-kunden').textContent = [...new Set(allData.map(r => r.kunde))].length;
+  document.getElementById('s-leistungen').textContent = allData.reduce((a, r) => a + (r.leistungen || []).length, 0);
+  const bald = allData.filter(r => getStatus(r).label === 'Läuft bald ab').length;
+  document.getElementById('s-ablauf').textContent = bald;
+  const total = allData.reduce((a, r) => a + (Number(r.invest_pa) || 0), 0);
+  document.getElementById('s-invest').textContent = total > 0 ? total.toLocaleString('de-DE') + ' €' : '—';
+}
+
+async function handleUpload(input) {
+  const files = Array.from(input.files);
+  if (!files.length) return;
+  input.value = '';
+  document.getElementById('upload-modal').classList.add('open');
+  let done = 0;
+  for (const file of files) {
+    setUploadProgress(`Analysiere: ${file.name}`, (done / files.length) * 100);
+    try {
+      const b64 = await toBase64(file);
+      const row = await extractFromPDF(b64);
+      if (row) {
+        const { error } = await sbClient.from('kunden').insert([row]);
+        if (error) throw new Error(error.message);
+        await loadData();
+        showNotify(`✓ ${row.kunde} hinzugefügt`);
+      }
+    } catch(e) {
+      showNotify('Fehler: ' + e.message);
+    }
+    done++;
+    setUploadProgress(`${done}/${files.length} PDFs verarbeitet`, (done / files.length) * 100);
+  }
+  setTimeout(() => document.getElementById('upload-modal').classList.remove('open'), 800);
+}
+
+function setUploadProgress(text, pct) {
+  document.getElementById('upload-status').textContent = text;
+  document.getElementById('upload-bar').style.width = pct + '%';
+}
+
+function toBase64(file) {
+  return new Promise((res, rej) => {
+    const r = new FileReader();
+    r.onload = () => res(r.result.split(',')[1]);
+    r.onerror = () => rej(new Error('Datei konnte nicht gelesen werden'));
+    r.readAsDataURL(file);
+  });
+}
+
+async function extractFromPDF(b64) {
+  const apiKey = localStorage.getItem('openai_key');
+  if (!apiKey) throw new Error('Kein OpenAI API Key hinterlegt. Bitte Setup erneut aufrufen.');
+
+  // Extract text from PDF using PDF.js
+  pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+  const pdfData = atob(b64);
+  const pdfBytes = new Uint8Array(pdfData.length);
+  for (let i = 0; i < pdfData.length; i++) pdfBytes[i] = pdfData.charCodeAt(i);
+  const pdf = await pdfjsLib.getDocument({ data: pdfBytes }).promise;
+  let fullText = '';
+  for (let p = 1; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    fullText += tc.items.map(i => i.str).join(' ') + '\n';
+  }
+
+  const prompt = `Du analysierst ein Angebotsdokument. Das Dokument wurde von Smile AI GmbH erstellt und an einen KUNDEN geschickt.
+
+WICHTIG: "kunde" ist der EMPFAENGER des Angebots, NICHT "Smile AI GmbH". Smile AI ist der Absender.
+Suche ganz am Ende des Textes nach "Angebotsempfaenger:" - dort steht der richtige Kundenname (z.B. "Angelini Pharma Deutschland GmbH" oder "Bayer Vital GmbH").
+
+Extrahiere diese Felder und antworte NUR mit validem JSON, absolut kein Markdown oder Erklaerungen:
+
+- "kunde": Suche nach "Angebotsempfaenger:" am Ende des Dokuments. Dort steht oft Name + Firma + Adresse. Extrahiere NUR den Firmennamen (z.B. "Bionorica SE", "Angelini Pharma Deutschland GmbH", "Bayer Vital GmbH"). Persoenliche Namen wie "Andreas Bais" ignorieren. NIEMALS "Smile AI GmbH".
+- "angebotsnr": Nach "Angebotsnummer:" z.B. "ANG-666881-001"
+- "angebotsdatum": Steht direkt neben der Angebotsnummer oben im Dokument, z.B. "Angebotsnummer: AL-033-755, Angebotsdatum: 03.10.2025" - extrahiere das Datum im Format TT.MM.JJJJ
+- "vertragsbeginn": Aus dem Details-Abschnitt: entweder ein konkretes Datum wie "01.01.2026" oder Text wie "naechster Werktag nach Bestelleingang"
+- "laufzeit": z.B. "12 Monate" oder "24 Monate" - aus "Laufzeit von X Monaten"
+- "laufzeit_monate": Nur die Zahl, z.B. 12 oder 24
+- "verlaengerung": z.B. "12 Monate" aus "verlaengert sich automatisch um weitere X Monate"
+- "vertragsende_iso": Nur berechnen wenn konkretes Startdatum bekannt (Format JJJJ-MM-TT), sonst null
+- "invest_pa": Suche am Ende des Dokuments nach der letzten/finalen Investzeile - das ist immer die letzte fett hervorgehobene Zahl. Moegliche Bezeichnungen: "Finaler Invest bei X Monaten Laufzeit p.a.", "Finaler Monats-Invest", "Finaler Invest fuer JJJJ", "Paketpreis". Bei Jahresinvest direkt uebernehmen. Bei Monatsinvest x12 rechnen. Bei Invest fuer weniger als 12 Monate (z.B. Q4 = 3 Monate) auf 12 Monate hochrechnen. Nur die Zahl ohne Waehrungszeichen.
+- "invest_label": Den exakten Betrag und Zeitraum wie im Dokument, z.B. "75.000 EUR/Jahr", "10.002 EUR/Monat", "19.994 EUR (Q4 2025)"
+- - "leistungen": Lies die LINKE SPALTE der Angebotstabelle von oben nach unten durch. Jede Zeile mit einem Icon/Symbol hat darunter einen Modulnamen - das ist eine Leistung. Nimm den Namen EXAKT wie er in der linken Spalte steht, mehrzeilige Namen zusammenfuegen (z.B. "Full\nGerman Access" = "Full German Access", "Reaches and\nImpressions" = "Reaches and Impressions", "Retail Media\nonsite" = "Retail Media onsite"). Die grauen Kategoriezeilen wie "Support & Setup", "Tool & Data", "Countries" sind KEINE Leistungen - ignorieren. Erfasse ALLE Module lueckenlos von oben bis unten.
+- "notiz": Wichtige Sonderkonditionen, z.B. Rabatte oder besondere Zahlungsbedingungen
+
+{
+  "kunde": "",
+  "angebotsnr": "",
+  "angebotsdatum": "",
+  "vertragsbeginn": "",
+  "laufzeit": "",
+  "laufzeit_monate": 12,
+  "verlaengerung": "",
+  "vertragsende_iso": null,
+  "invest_pa": 0,
+  "invest_label": "",
+  "leistungen": [],
+  "notiz": ""
+}
+
+Angebotstext:
+${fullText.slice(0, 10000)}`;
+
+  const resp = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer ' + apiKey
+    },
+    body: JSON.stringify({
+      model: 'gpt-4o-mini',
+      max_tokens: 800,
+      messages: [{ role: 'user', content: prompt }]
+    })
+  });
+
+  if (!resp.ok) {
+    const err = await resp.json().catch(() => ({}));
+    throw new Error(err.error?.message || 'OpenAI Fehler ' + resp.status);
+  }
+
+  const json = await resp.json();
+  const text = json.choices?.[0]?.message?.content || '';
+  const clean = text.replace(/```json|```/g, '').trim();
+  return JSON.parse(clean);
+}
+
+// Manual modal
+function openManualModal() {
+  document.getElementById('modal-title').textContent = 'Kunde manuell hinzufügen';
+  document.getElementById('edit-id').value = '';
+  ['f-kunde','f-nr','f-datum','f-beginn','f-notiz','f-invest','f-leistungen'].forEach(id => {
+    document.getElementById(id).value = '';
+  });
+  document.getElementById('f-ende').value = '';
+  document.getElementById('manual-modal').classList.add('open');
+}
+
+function openEditModal(id) {
+  const r = allData.find(x => x.id === id);
+  if (!r) return;
+  document.getElementById('modal-title').textContent = 'Eintrag bearbeiten';
+  document.getElementById('edit-id').value = id;
+  document.getElementById('f-kunde').value = r.kunde || '';
+  document.getElementById('f-nr').value = r.angebotsnr || '';
+  document.getElementById('f-datum').value = r.angebotsdatum || '';
+  document.getElementById('f-beginn').value = r.vertragsbeginn || '';
+  document.getElementById('f-laufzeit').value = r.laufzeit || '12 Monate';
+  document.getElementById('f-ende').value = r.vertragsende_iso || '';
+  document.getElementById('f-invest').value = r.invest_pa || '';
+  document.getElementById('f-leistungen').value = (r.leistungen || []).join('\n');
+  document.getElementById('f-notiz').value = r.notiz || '';
+  document.getElementById('manual-modal').classList.add('open');
+}
+
+async function saveManual() {
+  const id = document.getElementById('edit-id').value;
+  const kunde = document.getElementById('f-kunde').value.trim();
+  if (!kunde) { alert('Kundenname ist Pflichtfeld.'); return; }
+  const laufzeit = document.getElementById('f-laufzeit').value;
+  const row = {
+    kunde,
+    angebotsnr: document.getElementById('f-nr').value.trim(),
+    angebotsdatum: document.getElementById('f-datum').value.trim(),
+    vertragsbeginn: document.getElementById('f-beginn').value.trim(),
+    laufzeit,
+    laufzeit_monate: parseInt(laufzeit) || 12,
+    verlaengerung: '12 Monate',
+    vertragsende_iso: document.getElementById('f-ende').value || null,
+    invest_pa: parseFloat(document.getElementById('f-invest').value) || null,
+    leistungen: document.getElementById('f-leistungen').value.split('\n').map(s => s.trim()).filter(Boolean),
+    notiz: document.getElementById('f-notiz').value.trim()
+  };
+  let error;
+  if (id) {
+    ({ error } = await sbClient.from('kunden').update(row).eq('id', id));
+  } else {
+    ({ error } = await sbClient.from('kunden').insert([row]));
+  }
+  if (error) { showNotify('Fehler: ' + error.message); return; }
+  closeModal('manual-modal');
+  await loadData();
+  showNotify(id ? '✓ Eintrag aktualisiert' : '✓ Kunde hinzugefügt');
+}
+
+async function deleteRow(id) {
+  if (!confirm('Eintrag wirklich löschen?')) return;
+  const { error } = await sbClient.from('kunden').delete().eq('id', id);
+  if (error) { showNotify('Fehler: ' + error.message); return; }
+  await loadData();
+  showNotify('Eintrag gelöscht');
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+async function editBeginn(id, el) {
+  const current = el.textContent.trim();
+  const val = prompt('Vertragsbeginn eingeben (TT.MM.JJJJ):', current === '— klicken' ? '' : current);
+  if (val === null) return;
+  const trimmed = val.trim();
+
+  const r = allData.find(x => x.id === id);
+  let neuesEnde = null;
+
+  // Parse DD.MM.YYYY
+  const dateParts = trimmed.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if (dateParts) {
+    const d = new Date(parseInt(dateParts[3]), parseInt(dateParts[2])-1, parseInt(dateParts[1]));
+    const monate = r.laufzeit_monate || 12;
+    d.setMonth(d.getMonth() + monate);
+    neuesEnde = d.toISOString().slice(0,10);
+  }
+
+  const { error } = await sbClient.from('kunden').update({
+    vertragsbeginn: trimmed,
+    vertragsende_iso: neuesEnde
+  }).eq('id', id);
+
+  if (error) { showNotify('Fehler: ' + error.message); return; }
+  await loadData();
+  if (neuesEnde) {
+    const endeFormatted = new Date(neuesEnde).toLocaleDateString('de-DE', {day:'2-digit',month:'2-digit',year:'numeric'});
+    showNotify('✓ Vertragsbeginn gespeichert – Vertragsende: ' + endeFormatted);
+  } else {
+    showNotify('✓ Gespeichert – bitte Datum im Format TT.MM.JJJJ eingeben für automatisches Vertragsende');
+  }
+}
+
+let activeLeistungFilter = 'alle';
+
+function switchTab(tab) {
+  document.querySelectorAll('.tab-btn').forEach((b,i) => b.classList.toggle('active', (tab==='liste'&&i===0)||(tab==='matrix'&&i===1)));
+  document.getElementById('tab-liste').classList.toggle('active', tab==='liste');
+  document.getElementById('tab-matrix').classList.toggle('active', tab==='matrix');
+  if (tab === 'matrix') renderMatrix();
+}
+
+function toggleLeistungFilter(name, el) {
+  // Find the matching full leistung name (safe version strips quotes)
+  if (name !== 'alle') {
+    const match = [...new Set(allData.flatMap(r => r.leistungen || []))].find(l => l.replace(/['"]/g,'') === name || l === name);
+    activeLeistungFilter = match || name;
+  } else {
+    activeLeistungFilter = 'alle';
+  }
+  document.querySelectorAll('.filter-tag').forEach(t => t.classList.remove('active'));
+  el.classList.add('active');
+  renderMatrix();
+}
+
+function renderMatrix() {
+  const allLeistungen = [...new Set(allData.flatMap(function(r){ return r.leistungen || []; }))].sort();
+  const filterDiv = document.getElementById('leistung-filter');
+  let filterHtml = '<span style="font-size:12px;color:var(--text2)">Filter:</span>';
+  filterHtml += '<button class="filter-tag' + (activeLeistungFilter==='alle' ? ' active' : '') + '" onclick="toggleLeistungFilter(\'alle\', this)">Alle</button>';
+  allLeistungen.forEach(function(l) {
+    const safe = l.replace(/'/g, '').replace(/"/g, '');
+    const isActive = activeLeistungFilter === l;
+    filterHtml += '<button class="filter-tag' + (isActive ? ' active' : '') + '" onclick="toggleLeistungFilter(\'' + safe + '\', this)">' + l + '</button>';
+  });
+  filterDiv.innerHTML = filterHtml;
+
+  const showLeistungen = activeLeistungFilter === 'alle' ? allLeistungen : [activeLeistungFilter];
+  const showKunden = activeLeistungFilter === 'alle' ? allData :
+    allData.filter(function(r){ return (r.leistungen||[]).includes(activeLeistungFilter); });
+
+  let headHtml = '<tr><th class="kunde-col">Kunde</th>';
+  showLeistungen.forEach(function(l) {
+    headHtml += '<th style="max-width:120px;white-space:normal;text-align:center">' + l + '</th>';
+  });
+  headHtml += '<th>Laufzeit</th><th>Vertragsende</th><th>Invest p.a.</th></tr>';
+  document.getElementById('matrix-head').innerHTML = headHtml;
+
+  let bodyHtml = '';
+  showKunden.forEach(function(r) {
+    bodyHtml += '<tr><td class="kunde-name">' + r.kunde + '<small>' + (r.angebotsnr||'') + '</small></td>';
+    showLeistungen.forEach(function(l) {
+      const has = (r.leistungen||[]).includes(l);
+      bodyHtml += '<td>' + (has ? '<span class="matrix-check">✓</span>' : '<span class="matrix-empty">·</span>') + '</td>';
+    });
+    bodyHtml += '<td style="white-space:nowrap;font-size:12px">' + (r.laufzeit||'—') + '</td>';
+    bodyHtml += '<td style="white-space:nowrap;font-size:12px">' + (r.vertragsende_iso ? fmtDate(r.vertragsende_iso) : '—') + '</td>';
+    bodyHtml += '<td style="white-space:nowrap;font-size:12px;font-weight:500">' + (r.invest_label||fmtEuro(r.invest_pa)) + '</td>';
+    bodyHtml += '</tr>';
+  });
+  document.getElementById('matrix-body').innerHTML = bodyHtml;
+}
+
+function openSettings() {
+  const current = localStorage.getItem('openai_key') || '';
+  const key = prompt('OpenAI API Key eingeben (sk-...):', current ? '****' + current.slice(-4) : '');
+  if (key && key !== '****' + current.slice(-4)) {
+    localStorage.setItem('openai_key', key.trim());
+    showNotify('✓ API Key gespeichert');
+  }
+}
+
+function exportCSV() {
+  const headers = ['Kunde','Angebotsnr','Angebotsdatum','Vertragsbeginn','Laufzeit','Vertragsende','Invest p.a.','Status','Leistungen','Notiz'];
+  const rows = allData.map(r => {
+    const st = getStatus(r);
+    return [r.kunde, r.angebotsnr, r.angebotsdatum, r.vertragsbeginn, r.laufzeit,
+      r.vertragsende_iso ? fmtDate(r.vertragsende_iso) : '',
+      r.invest_label || fmtEuro(r.invest_pa), st.label,
+      (r.leistungen || []).join(' | '), r.notiz
+    ].map(v => '"' + String(v||'').replace(/"/g,'""') + '"').join(',');
+  });
+  const csv = [headers.join(','), ...rows].join('\n');
+  const a = document.createElement('a');
+  a.href = 'data:text/csv;charset=utf-8,\uFEFF' + encodeURIComponent(csv);
+  a.download = 'csm_leistungsuebersicht_' + new Date().toISOString().slice(0,10) + '.csv';
+  a.click();
+}
+
+function showNotify(msg) {
+  const n = document.getElementById('notify');
+  n.textContent = msg;
+  n.classList.add('show');
+  setTimeout(() => n.classList.remove('show'), 2800);
+}
+
+// Close modals on bg click
+document.querySelectorAll('.modal-bg').forEach(bg => {
+  bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('open'); });
+});
+</script>
 </body>
 </html>
