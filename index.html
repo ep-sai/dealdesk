@@ -9,7 +9,9 @@
 
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-authentication-library/2.38.0/msal-browser.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-authentication-library/2.38.0/msal-browser.min.js"
+    onerror="document.body.innerHTML='<div style=\'font-family:sans-serif;padding:2rem;color:#7B2020\'>Fehler: MSAL konnte nicht geladen werden. Bitte Internetverbindung prüfen.</div>'">
+  </script>
 
   <style>
     :root {
@@ -284,6 +286,9 @@
   function fmtE(v) { if (!v) return '—'; return Number(v).toLocaleString('de-DE') + ' €'; }
 
   /* ── Microsoft Login ── */
+  // Show login screen immediately – MSAL will hide it if already authenticated
+  gi('login-screen').style.display = 'flex';
+
   var msalInstance = new msal.PublicClientApplication({
     auth: { clientId: CLIENT_ID, authority: 'https://login.microsoftonline.com/' + TENANT_ID, redirectUri: REDIRECT_URI },
     cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false }
@@ -304,6 +309,7 @@
   }).catch(function(e) {
     gi('login-screen').style.display = 'flex';
     gi('login-err').textContent = 'Login fehlgeschlagen: ' + e.message;
+    console.error('MSAL error:', e);
   });
 
   function doMSLogin() { msalInstance.loginRedirect({ scopes: ['User.Read'] }); }
