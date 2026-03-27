@@ -9,8 +9,8 @@
 
   <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/microsoft-authentication-library/2.38.0/msal-browser.min.js"
-    onerror="document.body.innerHTML='<div style=\'font-family:sans-serif;padding:2rem;color:#7B2020\'>Fehler: MSAL konnte nicht geladen werden. Bitte Internetverbindung prüfen.</div>'">
+  <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js"
+    onerror="document.getElementById('login-err').textContent='Fehler: Microsoft Auth konnte nicht geladen werden.'">
   </script>
 
   <style>
@@ -138,6 +138,7 @@
       Mit Microsoft anmelden
     </button>
     <div class="login-err" id="login-err"></div>
+    <div style="font-size:11px;color:var(--text3);margin-top:8px" id="login-debug"></div>
     <p class="login-hint">Nur für Smile AI Mitarbeitende</p>
   </div>
 </div>
@@ -286,37 +287,67 @@
   function fmtE(v) { if (!v) return '—'; return Number(v).toLocaleString('de-DE') + ' €'; }
 
   /* ── Microsoft Login ── */
-  // Show login screen immediately – MSAL will hide it if already authenticated
+  // Show login screen immediately
   gi('login-screen').style.display = 'flex';
 
-  var msalInstance = new msal.PublicClientApplication({
-    auth: { clientId: CLIENT_ID, authority: 'https://login.microsoftonline.com/' + TENANT_ID, redirectUri: REDIRECT_URI },
-    cache: { cacheLocation: 'localStorage', storeAuthStateInCookie: false }
-  });
+  var msalInstance = null;
 
-  msalInstance.handleRedirectPromise().then(function(response) {
-    if (response && response.account) {
-      lss('ms_user', JSON.stringify({ name: response.account.name, email: response.account.username }));
-      showApp();
-    } else {
-      var accounts = msalInstance.getAllAccounts();
-      if (accounts.length > 0) {
-        showApp();
-      } else {
-        gi('login-screen').style.display = 'flex';
-      }
+  function initMSAL() {
+    try {
+      msalInstance = new msal.PublicClientApplication({
+        auth: {
+          clientId: CLIENT_ID,
+          authority: 'https://login.microsoftonline.com/' + TENANT_ID,
+          redirectUri: REDIRECT_URI
+        },
+        cache: { cacheLocation: 'sessionStorage', storeAuthStateInCookie: true }
+      });
+
+      msalInstance.handleRedirectPromise().then(function(response) {
+        if (response && response.account) {
+          lss('ms_user', JSON.stringify({ name: response.account.name, email: response.account.username }));
+          showApp();
+        } else {
+          var accounts = msalInstance.getAllAccounts();
+          if (accounts.length > 0) {
+            lss('ms_user', JSON.stringify({ name: accounts[0].name, email: accounts[0].username }));
+            showApp();
+          }
+        }
+      }).catch(function(e) {
+        gi('login-err').textContent = 'Fehler: ' + e.message;
+        if (gi('login-debug')) gi('login-debug').textContent = e.errorCode || '';
+        console.error('MSAL redirect error:', e);
+      });
+
+    } catch(e) {
+      gi('login-err').textContent = 'MSAL Init Fehler: ' + e.message;
+      console.error('MSAL init error:', e);
     }
-  }).catch(function(e) {
-    gi('login-screen').style.display = 'flex';
-    gi('login-err').textContent = 'Login fehlgeschlagen: ' + e.message;
-    console.error('MSAL error:', e);
-  });
+  }
 
-  function doMSLogin() { msalInstance.loginRedirect({ scopes: ['User.Read'] }); }
+  // Init after page load
+  if (typeof msal !== 'undefined') {
+    initMSAL();
+  } else {
+    gi('login-err').textContent = 'Microsoft Auth Bibliothek konnte nicht geladen werden.';
+  }
+
+  function doMSLogin() {
+    if (!msalInstance) { gi('login-err').textContent = 'MSAL nicht initialisiert.'; return; }
+    try {
+      msalInstance.loginRedirect({ scopes: ['User.Read'] });
+    } catch(e) {
+      gi('login-err').textContent = 'Login Fehler: ' + e.message;
+      console.error('loginRedirect error:', e);
+    }
+  }
 
   function doLogout() {
     localStorage.removeItem('ms_user');
-    msalInstance.logoutRedirect();
+    sessionStorage.clear();
+    if (msalInstance) msalInstance.logoutRedirect();
+    else window.location.reload();
   }
 
   function showApp() {
