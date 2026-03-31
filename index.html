@@ -599,7 +599,7 @@ function renderV(){
     var st=stOf(r);
     var tags=(r.leistungen||[]).map(function(l){return'<span class="tag">'+l+'</span>';}).join('');
     var verl=r.verlaengerung?'<span style="font-size:11px;color:var(--tx3);display:block;margin-top:2px">+'+r.verlaengerung+' Auto</span>':'';
-    var pdfLink=r.pdf_url?'<a href="'+r.pdf_url+'" target="_blank" style="font-size:11px;color:var(--blue)">📎 Öffnen</a>':'<span style="font-size:11px;color:var(--tx3)">—</span>';
+    var pdfLink=r.pdf_url?'<button class="abt" onclick="openPDF(\'' + r.pdf_url + '\')" style="font-size:11px">📎 Öffnen</button>':'<span style="font-size:11px;color:var(--tx3)">—</span>';
     return'<tr>'+
       '<td style="font-weight:500;min-width:160px">'+r.kunde+'<small style="font-weight:400;color:var(--tx3);font-size:11px;display:block;margin-top:2px;font-family:DM Mono,monospace">'+(r.angebotsnr||'')+'</small></td>'+
       '<td>'+(tags||'<span style="color:var(--tx3)">—</span>')+'</td>'+
@@ -833,8 +833,8 @@ async function doPDF(input){
           var fname=Date.now()+'_'+files[i].name.replace(/[^a-zA-Z0-9._-]/g,'_');
           var up=await SB.storage.from('vertraege').upload(fname,files[i],{contentType:'application/pdf',upsert:false});
           if(!up.error){
-            var pub=SB.storage.from('vertraege').getPublicUrl(fname);
-            pdfUrl=pub.data.publicUrl;
+            var signed=await SB.storage.from('vertraege').createSignedUrl(fname,3600);
+            if(signed.data)pdfUrl=fname; // store filename, generate signed URL on demand
           }
         }catch(e){console.warn('PDF upload failed:',e);}
         var row={
@@ -894,7 +894,7 @@ function openEdit(id){
   gi('fende').value=r.vertragsende_iso||'';gi('finv').value=r.invest_final||r.invest||'';
   setL(r.leistungen||[]);gi('fnotiz').value=r.notiz||'';
   var pl=gi('fpdf-link');
-  if(r.pdf_url){pl.style.display='block';pl.innerHTML='<a href="'+r.pdf_url+'" target="_blank">📎 Hochgeladener Vertrag öffnen</a>';}
+  if(r.pdf_url){pl.style.display='block';pl.innerHTML='<button class="abt" onclick="openPDF(\'' + r.pdf_url + '\')">📎 Hochgeladener Vertrag öffnen</button>';}
   else{pl.style.display='none';}
   gi('fmodal').classList.add('on');
 }
@@ -925,6 +925,15 @@ function doCSV(){
   var rows=DATA.map(function(r){var st=stOf(r);return[r.kunde,r.angebotsnr,r.angebotsdatum,r.vertragsbeginn,r.laufzeit,r.vertragsende_iso?fmtD(r.vertragsende_iso):'',r.invest_final_label||fmtE(r.invest_final||r.invest),st.t,(r.leistungen||[]).join(' | '),r.notiz].map(function(v){return'"'+String(v||'').replace(/"/g,'""')+'"';}).join(',');});
   var csv=[h.join(',')].concat(rows).join('\n');
   var a=document.createElement('a');a.href='data:text/csv;charset=utf-8,\uFEFF'+encodeURIComponent(csv);a.download='dealdesk_'+new Date().toISOString().slice(0,10)+'.csv';a.click();
+}
+
+/* ── PDF öffnen (signierte URL) ── */
+async function openPDF(fname){
+  try{
+    var r=await SB.storage.from('vertraege').createSignedUrl(fname,3600);
+    if(r.data&&r.data.signedUrl){window.open(r.data.signedUrl,'_blank');}
+    else{toast('PDF konnte nicht geöffnet werden.');}
+  }catch(e){toast('Fehler: '+e.message);}
 }
 
 /* ── Toast ── */
