@@ -524,9 +524,34 @@ function gv(id){return gi(id).value.trim();}
 function fmtD(iso){if(!iso)return'—';return new Date(iso).toLocaleDateString('de-DE',{day:'2-digit',month:'2-digit',year:'numeric'});}
 function fmtE(v){if(!v)return'—';return Number(v).toLocaleString('de-DE')+' €';}
 function dL(iso){return Math.round((new Date(iso)-new Date())/86400000);}
+function parseDE(s){
+  // Parse TT.MM.JJJJ or JJJJ-MM-TT
+  if(!s)return null;
+  var m=s.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
+  if(m)return new Date(parseInt(m[3]),parseInt(m[2])-1,parseInt(m[1]));
+  var d=new Date(s);
+  return isNaN(d)?null:d;
+}
+function calcEnde(r){
+  // Try to calculate end date from angebotsdatum or vertragsbeginn + laufzeit_monate
+  var start=parseDE(r.vertragsbeginn)||parseDE(r.angebotsdatum);
+  if(!start)return null;
+  var monate=r.laufzeit_monate||12;
+  var ende=new Date(start);
+  ende.setMonth(ende.getMonth()+monate);
+  return ende;
+}
 function stOf(r){
-  if(!r.vertragsende_iso)return{t:'Unbekannt',c:'binfo',col:'#378ADD'};
-  var d=dL(r.vertragsende_iso);
+  // Use stored end date if available
+  var endDate=null;
+  if(r.vertragsende_iso){
+    endDate=new Date(r.vertragsende_iso);
+  } else {
+    // Calculate from angebotsdatum/vertragsbeginn + laufzeit
+    endDate=calcEnde(r);
+  }
+  if(!endDate||isNaN(endDate))return{t:'Unbekannt',c:'binfo',col:'#378ADD'};
+  var d=Math.round((endDate-new Date())/86400000);
   if(d<0)return{t:'Abgelaufen',c:'bdanger',col:'#E24B4A'};
   if(d<=90)return{t:'Läuft bald ab',c:'bwarn',col:'#EF9F27'};
   return{t:'Aktiv',c:'bok',col:'#1D9E75'};
