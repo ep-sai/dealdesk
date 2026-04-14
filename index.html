@@ -34,6 +34,10 @@
     .tab{background:none;border:none;border-bottom:2px solid transparent;padding:10px 20px;font-family:"DM Sans",sans-serif;font-size:13px;font-weight:500;cursor:pointer;color:var(--tx2);margin-bottom:-1px;white-space:nowrap;}
     .tab:hover{color:var(--tx);}
     .tab.on{color:var(--tx);border-bottom-color:var(--ac);}
+    .tab.dis{color:var(--bdr2);cursor:not-allowed;opacity:.5;}
+    .tab.dis:hover{color:var(--bdr2);}
+    .org-sel{appearance:none;-webkit-appearance:none;background:var(--sur) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath d='M0 0l5 6 5-6z' fill='%239E9B93'/%3E%3C/svg%3E") no-repeat right 10px center;border:1px solid var(--bdr2);border-radius:var(--r);padding:6px 28px 6px 10px;font-family:"DM Sans",sans-serif;font-size:12px;cursor:pointer;color:var(--tx);outline:none;}
+    .org-sel:hover{background-color:var(--sur2);}
     .main{padding:2rem;max-width:1400px;margin:0 auto;}
     .tc{display:none;}
     .tc.on{display:block;}
@@ -85,7 +89,7 @@
     .sbv{font-size:18px;font-weight:600;}
     .mwrap{overflow-x:auto;border:1px solid var(--bdr);border-radius:var(--rl);background:var(--sur);}
     .mt{border-collapse:collapse;font-size:12px;min-width:100%;}
-    .mt th{background:var(--sur2);padding:7px 10px;border:1px solid var(--bdr);font-weight:500;font-size:10px;text-transform:uppercase;color:var(--tx2);white-space:nowrap;}
+    .mt th{background:var(--sur2);padding:7px 8px;border:1px solid var(--bdr);font-weight:500;font-size:9px;text-transform:uppercase;color:var(--tx2);white-space:normal;min-width:90px;max-width:120px;line-height:1.4;vertical-align:bottom;text-align:center;}
     .mt th.kc{min-width:180px;text-align:left;position:sticky;left:0;z-index:2;}
     .mt td{padding:7px 10px;border:1px solid var(--bdr);text-align:center;}
     .mt td.kn{text-align:left;font-weight:500;font-size:12px;position:sticky;left:0;background:var(--sur);z-index:1;}
@@ -147,6 +151,13 @@
     .empty{text-align:center;padding:4rem 2rem;color:var(--tx3);}
     .notify{position:fixed;bottom:1.5rem;right:1.5rem;background:var(--ac);color:var(--acfg);border-radius:var(--r);padding:10px 18px;font-size:13px;z-index:999;opacity:0;transform:translateY(8px);transition:all .2s;pointer-events:none;}
     .notify.on{opacity:1;transform:translateY(0);}
+    /* Review Modal */
+    .rv-grid{display:grid;grid-template-columns:140px 1fr;gap:0;font-size:13px;}
+    .rv-l{padding:8px 12px;color:var(--tx3);font-size:12px;border-bottom:1px solid var(--bdr);}
+    .rv-v{padding:8px 12px;font-weight:500;border-bottom:1px solid var(--bdr);}
+    .rv-tags{display:flex;flex-wrap:wrap;gap:4px;}
+    .dup-box{background:var(--abg);border:1px solid #E0C56A;border-radius:var(--r);padding:1rem 1.25rem;margin-bottom:1rem;}
+    .dup-box a{color:var(--blue);text-decoration:underline;cursor:pointer;}
     /* Angebot Preview Modal */
     .aprev{background:var(--sur);border:1px solid var(--bdr);border-radius:var(--r);padding:1.5rem;margin-top:1rem;font-size:12px;max-height:400px;overflow-y:auto;}
     .aprev-row{display:flex;gap:8px;padding:8px 0;border-bottom:1px solid var(--bdr);}
@@ -179,21 +190,27 @@
     <div class="logo">Deal<span>Desk</span></div>
     <div class="sp"></div>
     <span id="uname" style="font-size:12px;color:var(--tx3);"></span>
+    <select id="org-select" class="org-sel" title="Unternehmen wechseln" onchange="onOrgChange(this.value)">
+      <option value="smile">Smile AI</option>
+      <option value="kaske-group">Kaske Group</option>
+      <option value="dr-kaske">Dr. Kaske</option>
+      <option value="dr-vital">Dr. Vital</option>
+    </select>
     <button class="tbtn" onclick="openAdd()">+ Manuell</button>
     <label class="tbtn pri" style="cursor:pointer">↑ PDF hochladen<input type="file" accept=".pdf" multiple style="display:none" onchange="doPDF(this)"></label>
     <button class="tbtn" onclick="doLogout()" title="Abmelden">↩</button>
   </div>
   <div class="tabs">
-    <button class="tab on" onclick="doTab('ceo')">📊 Dashboard</button>
-    <button class="tab" onclick="doTab('vertraege')">Vertragsübersicht</button>
+    <button class="tab" onclick="doTab('ceo')">📊 Dashboard</button>
+    <button class="tab on" onclick="doTab('vertraege')">Vertragsübersicht</button>
     <button class="tab" onclick="doTab('matrix')">Leistungsmatrix</button>
     <button class="tab" onclick="doTab('frueh')">⚠ Frühwarnsystem</button>
-    <button class="tab" onclick="doTab('master')">📋 Angebotsmaster</button>
+    <button class="tab dis" onclick="return false" title="Kommt bald">📋 Angebotsmaster</button>
   </div>
   <div class="main">
 
     <!-- CEO -->
-    <div id="tc-ceo" class="tc on">
+    <div id="tc-ceo" class="tc">
       <style>
         .kpi{position:relative;}
         .kinfo{display:inline-flex;align-items:center;justify-content:center;width:15px;height:15px;border-radius:50%;background:var(--bdr2);color:var(--tx3);font-size:10px;font-weight:600;cursor:help;margin-left:5px;flex-shrink:0;vertical-align:middle;}
@@ -236,7 +253,7 @@
     </div>
 
     <!-- VERTRAGSÜBERSICHT -->
-    <div id="tc-vertraege" class="tc">
+    <div id="tc-vertraege" class="tc on">
       <div class="toolbar">
         <input type="text" id="qsearch" placeholder="🔍 Suchen..." oninput="renderV()">
         <select id="qst" onchange="renderV()"><option value="">Alle Status</option><option>Aktiv</option><option>Läuft bald ab</option><option>Abgelaufen</option><option>Unbekannt</option></select>
@@ -323,6 +340,19 @@
     <div class="uprog" id="uprog">Lese PDF...</div>
     <div style="margin-top:1rem;background:var(--sur2);border-radius:var(--r);height:4px;overflow:hidden"><div id="ubar" style="height:100%;background:var(--ac);width:0%;transition:width .3s"></div></div>
     <div style="margin-top:1rem;text-align:center"><button class="sbtn" onclick="cancelUpload()" style="font-size:12px;padding:6px 16px">✕ Abbrechen</button></div>
+  </div>
+</div>
+
+<!-- MODAL: Review nach Upload -->
+<div class="mbg" id="rvmodal">
+  <div class="modal" style="max-width:640px">
+    <h3>📋 Vertrag prüfen</h3>
+    <div id="rv-dup" style="display:none"></div>
+    <div id="rv-body"></div>
+    <div class="mact" id="rv-actions">
+      <button class="sbtn" id="rv-skip">Überspringen</button>
+      <button class="btn" id="rv-save">✓ Speichern</button>
+    </div>
   </div>
 </div>
 
@@ -605,10 +635,12 @@ function showApp(){
 
 /* ── Data ── */
 async function doLoad(){
-  var r=await SB.from('kunden').select('*').order('created_at',{ascending:false});
-  if(r.error){toast('Fehler: '+r.error.message);return;}
-  DATA=r.data||[];
-  renderCEO();renderV();renderMatrix();renderFrueh();
+  try{
+    var r=await SB.from('kunden').select('*').order('created_at',{ascending:false});
+    if(r.error){toast('DB-Fehler: '+r.error.message);console.error('Supabase:',r.error);return;}
+    DATA=r.data||[];
+    renderCEO();renderV();renderMatrix();renderFrueh();
+  }catch(e){toast('Verbindungsfehler: '+e.message);console.error('doLoad:',e);}
 }
 
 /* ── Tabs ── */
@@ -687,7 +719,7 @@ function renderV(){
     var st=stOf(r);
     var tags=(r.leistungen||[]).map(function(l){return'<span class="tag">'+l+'</span>';}).join('');
     var verl=r.verlaengerung?'<span style="font-size:11px;color:var(--tx3);display:block;margin-top:2px">+'+r.verlaengerung+' Auto</span>':'';
-    var pdfLink=r.pdf_url?'<button class="abt" onclick="openPDF(\'' + r.pdf_url + '\')" style="font-size:11px">📎 Öffnen</button>':'<span style="font-size:11px;color:var(--tx3)">—</span>';
+    var pdfLink=r.pdf_url?'<button class="abt" onclick="openPDF(\'' + r.pdf_url + '\')" style="font-size:12px;display:inline-flex;align-items:center;gap:4px;color:var(--blue)" title="Vertrag öffnen">📄 PDF</button>':'<span style="font-size:11px;color:var(--tx3)">—</span>';
     return'<tr>'+
       '<td style="font-weight:500;min-width:160px">'+r.kunde+'<small style="font-weight:400;color:var(--tx3);font-size:11px;display:block;margin-top:2px;font-family:DM Mono,monospace">'+(r.angebotsnr||'')+'</small></td>'+
       '<td>'+(tags||'<span style="color:var(--tx3)">—</span>')+'</td>'+
@@ -943,12 +975,53 @@ function doExportAngebot(){
 
 /* ── PDF Upload ── */
 var UPLOAD_CANCELLED=false;
+var UPLOAD_QUEUE=[];  // {file, parsed, existing}
+var UPLOAD_IDX=0;
 
 function cancelUpload(){
   UPLOAD_CANCELLED=true;
   gi('upmodal').classList.remove('on');
+  gi('rvmodal').classList.remove('on');
   toast('Upload abgebrochen');
 }
+
+/* Show review modal for one parsed contract – returns Promise resolved by user action */
+function showReview(parsed, file, existing){
+  return new Promise(function(resolve){
+    var body=gi('rv-body');
+    var dup=gi('rv-dup');
+    var leistTags=(parsed.leistungen||[]).map(function(l){return'<span class="tag">'+l+'</span>';}).join(' ')||'—';
+    var investLabel=parsed.invest_final_label||parsed.invest_final||parsed.invest||'—';
+    body.innerHTML=
+      '<div class="rv-grid">'+
+        '<div class="rv-l">Kunde</div><div class="rv-v">'+esc(parsed.kunde||'—')+'</div>'+
+        '<div class="rv-l">Angebotsnr.</div><div class="rv-v" style="font-family:DM Mono,monospace;font-size:12px">'+esc(parsed.angebotsnr||'—')+'</div>'+
+        '<div class="rv-l">Angebotsdatum</div><div class="rv-v">'+esc(parsed.angebotsdatum||'—')+'</div>'+
+        '<div class="rv-l">Vertragsbeginn</div><div class="rv-v">'+esc(parsed.vertragsbeginn||'—')+'</div>'+
+        '<div class="rv-l">Laufzeit</div><div class="rv-v">'+esc(parsed.laufzeit||'—')+'</div>'+
+        '<div class="rv-l">Invest</div><div class="rv-v">'+esc(String(investLabel))+(parsed.invest_rhythmus?' <span style="font-weight:400;color:var(--tx3);font-size:12px">'+esc(parsed.invest_rhythmus)+'</span>':'')+'</div>'+
+        '<div class="rv-l">Leistungen</div><div class="rv-v"><div class="rv-tags">'+leistTags+'</div></div>'+
+        (parsed.notiz?'<div class="rv-l">Notiz</div><div class="rv-v" style="font-weight:400;font-size:12px">'+esc(parsed.notiz)+'</div>':'')+
+      '</div>';
+    // Duplicate info
+    if(existing){
+      dup.style.display='block';
+      dup.innerHTML='<div class="dup-box"><div style="font-weight:600;font-size:13px;margin-bottom:4px">⚠ Vertrag bereits vorhanden</div>'+
+        '<div style="font-size:12px">Angebotsnr. <strong>'+esc(existing.angebotsnr)+'</strong> für <strong>'+esc(existing.kunde)+'</strong> existiert bereits in der '+
+        '<a onclick="gi(\'rvmodal\').classList.remove(\'on\');doTab(\'vertraege\');gi(\'qsearch\').value=\''+esc(existing.angebotsnr)+'\';renderV();">Vertragsübersicht</a>.</div>'+
+        '</div>';
+      gi('rv-save').textContent='↻ Ersetzen';
+    } else {
+      dup.style.display='none';
+      gi('rv-save').textContent='✓ Speichern';
+    }
+    // Wire buttons
+    gi('rv-skip').onclick=function(){gi('rvmodal').classList.remove('on');resolve('skip');};
+    gi('rv-save').onclick=function(){gi('rvmodal').classList.remove('on');resolve('save');};
+    gi('rvmodal').classList.add('on');
+  });
+}
+function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 async function doPDF(input){
   var files=Array.from(input.files);if(!files.length)return;input.value='';
@@ -956,84 +1029,91 @@ async function doPDF(input){
   gi('upmodal').classList.add('on');
   for(var i=0;i<files.length;i++){
     if(UPLOAD_CANCELLED)break;
-    setP('Analysiere ('+( i+1)+'/'+files.length+'): '+files[i].name,(i/files.length)*100);
+    setP('Analysiere ('+(i+1)+'/'+files.length+'): '+files[i].name,(i/files.length)*100);
     try{
       var b64=await toB64(files[i]);
       if(UPLOAD_CANCELLED)break;
       var parsed=await doExtract(b64);
       if(UPLOAD_CANCELLED)break;
       if(parsed){
-        // Check for duplicate by Angebotsnummer
+        // Hide progress, show review
+        gi('upmodal').classList.remove('on');
+        // Check for duplicate
+        var existing=null;
         if(parsed.angebotsnr){
-          var existing=DATA.find(function(r){return r.angebotsnr&&r.angebotsnr.trim()===parsed.angebotsnr.trim();});
-          if(existing){
-            // Ask user: replace or skip
-            var replace=confirm('Vertrag "'+parsed.angebotsnr+'" ('+parsed.kunde+') ist bereits vorhanden.\n\nErsetzen?');
-            if(!replace){toast('⏭ '+parsed.kunde+' übersprungen');continue;}
-            // Delete old PDF from storage if exists
-            if(existing.pdf_url){try{await SB.storage.from('vertraege').remove([existing.pdf_url]);}catch(e){}}
-            // Update existing record
-            var pdfUrl=existing.pdf_url||null;
-            try{
-              var fname=Date.now()+'_'+files[i].name.replace(/[^a-zA-Z0-9._-]/g,'_');
-              var up=await SB.storage.from('vertraege').upload(fname,files[i],{contentType:'application/pdf',upsert:false});
-              if(!up.error)pdfUrl=fname;
-            }catch(e){console.warn('PDF upload failed:',e);}
-            var row={
-              kunde:parsed.kunde,angebotsnr:parsed.angebotsnr,angebotsdatum:parsed.angebotsdatum,
-              vertragsbeginn:parsed.vertragsbeginn,laufzeit:parsed.laufzeit,laufzeit_monate:parsed.laufzeit_monate||12,
-              verlaengerung:parsed.verlaengerung||'12 Monate',vertragsende_iso:parsed.vertragsende_iso||null,
-              invest_brutto:parsed.invest_brutto||null,invest_brutto_label:parsed.invest_brutto_label||null,
-              invest_rabatt_prozent:parsed.invest_rabatt_prozent||null,invest_final:parsed.invest_final||null,
-              invest_final_label:parsed.invest_final_label||null,invest_rhythmus:parsed.invest_rhythmus||'jaehrlich',
-              invest:parsed.invest_final||parsed.invest||null,invest_label:parsed.invest_final_label||parsed.invest_label||null,
-              leistungen:parsed.leistungen||[],notiz:parsed.notiz||''
-            };
-            if(pdfUrl)row.pdf_url=pdfUrl;
-            var upd=await SB.from('kunden').update(row).eq('id',existing.id);
-            if(upd.error)throw new Error(upd.error.message);
-            await doLoad();toast('✓ '+parsed.kunde+' aktualisiert');
-            continue;
-          }
+          existing=DATA.find(function(r){return r.angebotsnr&&r.angebotsnr.trim()===parsed.angebotsnr.trim();});
         }
-        // New record
-        var pdfUrl=null;
-        try{
-          var fname=Date.now()+'_'+files[i].name.replace(/[^a-zA-Z0-9._-]/g,'_');
-          var up=await SB.storage.from('vertraege').upload(fname,files[i],{contentType:'application/pdf',upsert:false});
-          if(!up.error)pdfUrl=fname;
-        }catch(e){console.warn('PDF upload failed:',e);}
-        var row={
-          kunde:parsed.kunde,angebotsnr:parsed.angebotsnr,angebotsdatum:parsed.angebotsdatum,
-          vertragsbeginn:parsed.vertragsbeginn,laufzeit:parsed.laufzeit,laufzeit_monate:parsed.laufzeit_monate||12,
-          verlaengerung:parsed.verlaengerung||'12 Monate',vertragsende_iso:parsed.vertragsende_iso||null,
-          invest_brutto:parsed.invest_brutto||null,invest_brutto_label:parsed.invest_brutto_label||null,
-          invest_rabatt_prozent:parsed.invest_rabatt_prozent||null,invest_final:parsed.invest_final||null,
-          invest_final_label:parsed.invest_final_label||null,invest_rhythmus:parsed.invest_rhythmus||'jaehrlich',
-          invest:parsed.invest_final||parsed.invest||null,invest_label:parsed.invest_final_label||parsed.invest_label||null,
-          leistungen:parsed.leistungen||[],notiz:parsed.notiz||''
-        };
-        if(pdfUrl)row.pdf_url=pdfUrl;
-        var ins=await SB.from('kunden').insert([row]);
-        if(ins.error)throw new Error(ins.error.message);
-        await doLoad();toast('✓ '+parsed.kunde+' hinzugefügt');
+        var action=await showReview(parsed,files[i],existing||null);
+        if(UPLOAD_CANCELLED)break;
+        if(action==='skip'){toast('⏭ '+parsed.kunde+' übersprungen');if(i<files.length-1)gi('upmodal').classList.add('on');continue;}
+        // Show progress again for saving
+        gi('upmodal').classList.add('on');
+        setP('Speichere: '+parsed.kunde,((i+0.5)/files.length)*100);
+        if(existing){
+          // Update existing
+          if(existing.pdf_url){try{await SB.storage.from('vertraege').remove([existing.pdf_url]);}catch(e){}}
+          var pdfUrl=existing.pdf_url||null;
+          try{
+            var fname=Date.now()+'_'+files[i].name.replace(/[^a-zA-Z0-9._-]/g,'_');
+            var up=await SB.storage.from('vertraege').upload(fname,files[i],{contentType:'application/pdf',upsert:false});
+            if(!up.error)pdfUrl=fname;
+          }catch(e){console.warn('PDF upload failed:',e);}
+          var row=buildRow(parsed,pdfUrl);
+          var upd=await SB.from('kunden').update(row).eq('id',existing.id);
+          if(upd.error)throw new Error(upd.error.message);
+          await doLoad();toast('✓ '+parsed.kunde+' aktualisiert');
+        } else {
+          // New record
+          var pdfUrl=null;
+          try{
+            var fname=Date.now()+'_'+files[i].name.replace(/[^a-zA-Z0-9._-]/g,'_');
+            var up=await SB.storage.from('vertraege').upload(fname,files[i],{contentType:'application/pdf',upsert:false});
+            if(!up.error)pdfUrl=fname;
+          }catch(e){console.warn('PDF upload failed:',e);}
+          var row=buildRow(parsed,pdfUrl);
+          var ins=await SB.from('kunden').insert([row]);
+          if(ins.error)throw new Error(ins.error.message);
+          await doLoad();toast('✓ '+parsed.kunde+' hinzugefügt');
+        }
       }
     }catch(e){toast('Fehler: '+e.message);}
+    // Re-show progress for next file
+    if(i<files.length-1&&!UPLOAD_CANCELLED){gi('upmodal').classList.add('on');}
   }
   if(!UPLOAD_CANCELLED){setP('Fertig',100);setTimeout(function(){gi('upmodal').classList.remove('on');},800);}
+}
+function buildRow(parsed,pdfUrl){
+  var row={
+    kunde:parsed.kunde,angebotsnr:parsed.angebotsnr,angebotsdatum:parsed.angebotsdatum,
+    vertragsbeginn:parsed.vertragsbeginn,laufzeit:parsed.laufzeit,laufzeit_monate:parsed.laufzeit_monate||12,
+    verlaengerung:parsed.verlaengerung||'12 Monate',vertragsende_iso:parsed.vertragsende_iso||null,
+    invest_brutto:parsed.invest_brutto||null,invest_brutto_label:parsed.invest_brutto_label||null,
+    invest_rabatt_prozent:parsed.invest_rabatt_prozent||null,invest_final:parsed.invest_final||null,
+    invest_final_label:parsed.invest_final_label||null,invest_rhythmus:parsed.invest_rhythmus||'jaehrlich',
+    invest:parsed.invest_final||parsed.invest||null,invest_label:parsed.invest_final_label||parsed.invest_label||null,
+    leistungen:parsed.leistungen||[],notiz:parsed.notiz||''
+  };
+  if(pdfUrl)row.pdf_url=pdfUrl;
+  return row;
 }
 function setP(t,p){gi('uprog').textContent=t;gi('ubar').style.width=p+'%';}
 function toB64(file){return new Promise(function(res,rej){var r=new FileReader();r.onload=function(){res(r.result.split(',')[1]);};r.onerror=function(){rej(new Error('Lesefehler'));};r.readAsDataURL(file);});}
 
 /* ── Anthropic via Netlify Proxy ── */
 async function doExtract(b64){
-  var resp=await fetch('/api/anthropic',{method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:[
-      {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
-      {type:'text',text:'Du analysierst ein Smile AI Angebotsdokument.\nAntworte NUR mit validem JSON. Kein Markdown.\n\n1. KUNDE: Nach "Angebotsempfaenger:" oder "Angebot fuer:". Nur Firmenname. Niemals "Smile AI GmbH" oder "Dr. Kaske GmbH".\n2. ANGEBOTSNR & DATUM: Nach "Angebotsnummer:" und "Angebotsdatum:". Exakt kopieren.\n3. LEISTUNGEN: Modulnamen 1:1 aus der linken Tabellenspalte. Kategoriezeilen weglassen.\n4. INVEST: Kurz vor/nach "Details:" alle Euro-Betraege. Letzte/kleinste=invest_final. invest_rhythmus: "monatlich" oder "jaehrlich".\n5. LAUFZEIT: Aus "bei X Monaten Laufzeit".\n6. VERTRAGSBEGINN: Aus "Laufzeit des Vertrages beginnt...".\n\n{"kunde":"","angebotsnr":"","angebotsdatum":"","vertragsbeginn":"","laufzeit":"","laufzeit_monate":12,"verlaengerung":"12 Monate","vertragsende_iso":null,"leistungen":[],"invest_brutto":0,"invest_brutto_label":"","invest_rabatt_prozent":null,"invest_final":0,"invest_final_label":"","invest_rhythmus":"jaehrlich","notiz":""}'}
-    ]}]})
-  });
-  if(!resp.ok){var e=await resp.json().catch(function(){return{};});throw new Error(e.error&&e.error.message?e.error.message:'Proxy Fehler '+resp.status);}
+  var resp;
+  try{
+    resp=await fetch('/api/anthropic',{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1500,messages:[{role:'user',content:[
+        {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
+        {type:'text',text:'Du analysierst ein Smile AI Angebotsdokument.\nAntworte NUR mit validem JSON. Kein Markdown.\n\n1. KUNDE: Nach "Angebotsempfaenger:" oder "Angebot fuer:". Nur Firmenname. Niemals "Smile AI GmbH" oder "Dr. Kaske GmbH".\n2. ANGEBOTSNR & DATUM: Nach "Angebotsnummer:" und "Angebotsdatum:". Exakt kopieren.\n3. LEISTUNGEN: Modulnamen 1:1 aus der linken Tabellenspalte. Kategoriezeilen weglassen.\n4. INVEST: Kurz vor/nach "Details:" alle Euro-Betraege. Letzte/kleinste=invest_final. invest_rhythmus: "monatlich" oder "jaehrlich".\n5. LAUFZEIT: Aus "bei X Monaten Laufzeit".\n6. VERTRAGSBEGINN: Aus "Laufzeit des Vertrages beginnt...".\n\n{"kunde":"","angebotsnr":"","angebotsdatum":"","vertragsbeginn":"","laufzeit":"","laufzeit_monate":12,"verlaengerung":"12 Monate","vertragsende_iso":null,"leistungen":[],"invest_brutto":0,"invest_brutto_label":"","invest_rabatt_prozent":null,"invest_final":0,"invest_final_label":"","invest_rhythmus":"jaehrlich","notiz":""}'}
+      ]}]})
+    });
+  }catch(e){throw new Error('Proxy nicht erreichbar – prüfe Netlify Function. ('+e.message+')');}
+  if(!resp.ok){
+    var errBody='';try{var ej=await resp.json();errBody=ej.error&&ej.error.message?ej.error.message:JSON.stringify(ej);}catch(e){errBody=await resp.text().catch(function(){return'';});}
+    throw new Error('Proxy Fehler '+resp.status+': '+errBody);
+  }
   var j=await resp.json();
   var txt=(j.content&&j.content[0]&&j.content[0].text)||'';
   var clean=txt.replace(/```json|```/g,'').trim();
@@ -1101,6 +1181,9 @@ async function openPDF(fname){
     else{toast('PDF konnte nicht geöffnet werden.');}
   }catch(e){toast('Fehler: '+e.message);}
 }
+
+/* ── Org-Dropdown (Platzhalter) ── */
+function onOrgChange(val){toast('Unternehmen: '+gi('org-select').options[gi('org-select').selectedIndex].text+' (kommt bald)');}
 
 /* ── Toast ── */
 function toast(msg){var n=gi('notify');n.textContent=msg;n.classList.add('on');setTimeout(function(){n.classList.remove('on');},2800);}
