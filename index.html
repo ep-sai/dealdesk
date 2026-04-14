@@ -281,12 +281,6 @@
       <div class="sbar">
         <div class="sbi"><div class="sbl">Module gesamt</div><div class="sbv" id="mmod">—</div></div>
         <div class="sbi"><div class="sbl">Ø Module/Kunde</div><div class="sbv" id="mavg">—</div></div>
-        <div class="sp"></div>
-        <select id="mfcat" onchange="renderMatrix()" style="padding:6px 8px;border:1px solid var(--bdr2);border-radius:var(--r);font-size:12px;background:var(--sur);color:var(--tx);outline:none;">
-          <option value="">Alle Cluster</option>
-          <option>Analytics</option><option>Operativ</option><option>Consulting</option>
-          <option>Amazon</option><option>Reporting</option><option>Knowledge</option><option>International</option>
-        </select>
       </div>
       <div class="mfilt" id="mfilt"></div>
       <div class="mwrap"><table class="mt"><thead id="mhead"></thead><tbody id="mbody"></tbody></table></div>
@@ -434,6 +428,7 @@ var REDIRECT='https://sai-dealdesk.netlify.app';
 
 /* ── State ── */
 var SB=null,DATA=[],FILTER_FRUEH='all',AM_SEL=[],AM_CAT='Analytics';
+var M_CATS=[]; // selected clusters for matrix (empty = Alle/overview)
 var V_SORT='kunde',V_DIR=1; // 1=asc, -1=desc
 var F_SORT='ende',F_DIR=1;
 var pieInst=null,barInst=null;
@@ -738,51 +733,94 @@ function renderV(){
 }
 
 /* ── Leistungsmatrix (eine Zeile pro Kunde, Maßnahmen zusammengeführt) ── */
+var CATS_LIST=['Analytics','Operativ','Consulting','Amazon','Reporting','Knowledge','International'];
+var CAT_COLORS={'Analytics':'#1D9E75','Operativ':'#378ADD','Consulting':'#BA7517','Amazon':'#D85A30','Reporting':'#7F77DD','Knowledge':'#D4537E','International':'#888780'};
+
+function toggleMatrixCat(cat){
+  if(cat===''){M_CATS=[];}
+  else{var idx=M_CATS.indexOf(cat);if(idx>=0)M_CATS.splice(idx,1);else M_CATS.push(cat);}
+  renderMatrix();
+}
+
 function renderMatrix(){
-  var filterCat=gi('mfcat').value;
   // Kunden deduplizieren
   var kundenMap={};
   DATA.forEach(function(r){
     if(!kundenMap[r.kunde])kundenMap[r.kunde]=new Set();
     (r.leistungen||[]).forEach(function(l){kundenMap[r.kunde].add(l);});
   });
-  // Alle Leistungen – optional nach Cluster filtern
-  var allLeistungen=[];
-  if(filterCat){
-    var catMods=AM_DATA[filterCat]?AM_DATA[filterCat].map(function(m){return m.name;}):[];
-    allLeistungen=[...new Set(Object.values(kundenMap).flatMap(function(s){return[...s];}))].filter(function(l){return catMods.includes(l)||AM_CLUSTER[l]===filterCat;}).sort();
-  } else {
-    allLeistungen=[...new Set(Object.values(kundenMap).flatMap(function(s){return[...s];}))].sort();
-  }
-  // Maßnahmen-Filter Tags
-  var mfEl=gi('mfilt');
-  var cats=['Analytics','Operativ','Consulting','Amazon','Reporting','Knowledge','International'];
-  var catColors={'Analytics':'#1D9E75','Operativ':'#378ADD','Consulting':'#BA7517','Amazon':'#D85A30','Reporting':'#7F77DD','Knowledge':'#D4537E','International':'#888780'};
-  mfEl.innerHTML='<span style="font-size:12px;color:var(--tx2)">Cluster:</span>'+
-    cats.map(function(c){return'<button class="mftag'+(filterCat===c?' on':'')+'" onclick="gi(\'mfcat\').value=\''+c+'\';renderMatrix()">'+c+'</button>';}).join('')+
-    '<button class="mftag'+(filterCat===''?' on':'')+'" onclick="gi(\'mfcat\').value=\'\';renderMatrix()">Alle</button>';
   // Stats
   var totalMods=Object.values(kundenMap).reduce(function(a,s){return a+s.size;},0);
   var numKunden=Object.keys(kundenMap).length;
   gi('mmod').textContent=totalMods;
   gi('mavg').textContent=numKunden?(totalMods/numKunden).toFixed(1):'—';
-  // Table
+  // Cluster buttons (Alle zuerst, dann die 7 Cluster)
+  var isAlle=M_CATS.length===0;
+  var mfEl=gi('mfilt');
+  mfEl.innerHTML='<span style="font-size:12px;color:var(--tx2)">Cluster:</span>'+
+    '<button class="mftag'+(isAlle?' on':'')+'" onclick="toggleMatrixCat(\'\')">Alle</button>'+
+    CATS_LIST.map(function(c){return'<button class="mftag'+(M_CATS.indexOf(c)>=0?' on':'')+'" onclick="toggleMatrixCat(\''+c+'\')">'+c+'</button>';}).join('');
+
+  var sortedKunden=Object.keys(kundenMap).sort();
   var thead='<tr><th class="kc">Kunde</th>';
-  allLeistungen.forEach(function(l){
-    var cat=AM_CLUSTER[l]||'';
-    var col=catColors[cat]||'#888';
-    thead+='<th style="max-width:90px;white-space:normal;text-align:center;border-top:3px solid '+col+'">'+l+'</th>';
-  });
-  thead+='</tr>';
-  gi('mhead').innerHTML=thead;
   var tbody='';
-  Object.keys(kundenMap).sort().forEach(function(kunde){
-    var lSet=kundenMap[kunde];
-    tbody+='<tr><td class="kn">'+kunde+'</td>';
-    allLeistungen.forEach(function(l){tbody+='<td>'+(lSet.has(l)?'<span class="mck">✓</span>':'<span class="mem">·</span>')+'</td>';});
-    tbody+='</tr>';
-  });
-  gi('mbody').innerHTML=tbody;
+
+  if(isAlle){
+    // ── Cluster-Übersicht: 7 Spalten = die Cluster ──
+    CATS_LIST.forEach(function(cat){
+      thead+='<th style="text-align:center;border-top:3px solid '+CAT_COLORS[cat]+';min-width:100px;white-space:normal">'+cat+'</th>';
+    });
+    thead+='</tr>';
+    sortedKunden.forEach(function(kunde){
+      var lSet=kundenMap[kunde];
+      tbody+='<tr><td class="kn">'+kunde+'</td>';
+      CATS_LIST.forEach(function(cat){
+        // Check if customer has ANY module in this cluster
+        var catMods=AM_DATA[cat]?AM_DATA[cat].map(function(m){return m.name;}):[];
+        var hasAny=false;
+        lSet.forEach(function(l){if(catMods.indexOf(l)>=0||AM_CLUSTER[l]===cat)hasAny=true;});
+        // Count how many
+        var count=0;
+        lSet.forEach(function(l){if(catMods.indexOf(l)>=0||AM_CLUSTER[l]===cat)count++;});
+        tbody+='<td style="text-align:center">'+(hasAny?'<span class="mck" title="'+count+' Modul'+(count>1?'e':'')+'">✓ <span style="font-size:10px;color:var(--tx3)">'+count+'</span></span>':'<span class="mem">·</span>')+'</td>';
+      });
+      tbody+='</tr>';
+    });
+  } else {
+    // ── Detailansicht: einzelne Module der ausgewählten Cluster ──
+    var allLeistungen=[];
+    M_CATS.forEach(function(cat){
+      var catMods=AM_DATA[cat]?AM_DATA[cat].map(function(m){return m.name;}):[];
+      // Also include leistungen mapped to this cluster
+      Object.values(kundenMap).forEach(function(s){s.forEach(function(l){if(AM_CLUSTER[l]===cat&&catMods.indexOf(l)<0)catMods.push(l);});});
+      catMods.forEach(function(m){
+        if(allLeistungen.indexOf(m)<0){
+          // Only include if at least one customer has it
+          var used=false;Object.values(kundenMap).forEach(function(s){if(s.has(m))used=true;});
+          if(used)allLeistungen.push(m);
+        }
+      });
+    });
+    allLeistungen.sort();
+    allLeistungen.forEach(function(l){
+      var cat=AM_CLUSTER[l]||'';
+      var col=CAT_COLORS[cat]||'#888';
+      thead+='<th style="text-align:center;border-top:3px solid '+col+';min-width:90px;max-width:120px;white-space:normal">'+l+'</th>';
+    });
+    thead+='</tr>';
+    sortedKunden.forEach(function(kunde){
+      var lSet=kundenMap[kunde];
+      // Only show customers that have at least one module in selected clusters
+      var relevant=false;
+      allLeistungen.forEach(function(l){if(lSet.has(l))relevant=true;});
+      if(!relevant)return;
+      tbody+='<tr><td class="kn">'+kunde+'</td>';
+      allLeistungen.forEach(function(l){tbody+='<td>'+(lSet.has(l)?'<span class="mck">✓</span>':'<span class="mem">·</span>')+'</td>';});
+      tbody+='</tr>';
+    });
+  }
+  gi('mhead').innerHTML=thead;
+  gi('mbody').innerHTML=tbody||'<tr><td colspan="8"><div class="empty">Keine Daten</div></td></tr>';
 }
 
 /* ── Sort helpers ── */
@@ -1052,28 +1090,30 @@ async function doPDF(input){
         if(existing){
           // Update existing
           if(existing.pdf_url){try{await SB.storage.from('vertraege').remove([existing.pdf_url]);}catch(e){}}
-          var pdfUrl=existing.pdf_url||null;
+          var pdfUrl=null;
           try{
             var fname=Date.now()+'_'+files[i].name.replace(/[^a-zA-Z0-9._-]/g,'_');
             var up=await SB.storage.from('vertraege').upload(fname,files[i],{contentType:'application/pdf',upsert:false});
-            if(!up.error)pdfUrl=fname;
-          }catch(e){console.warn('PDF upload failed:',e);}
+            if(up.error){console.error('Storage upload error:',up.error);toast('⚠ PDF-Speicher: '+up.error.message);}
+            else{pdfUrl=fname;console.log('PDF uploaded:',fname);}
+          }catch(e){console.error('Storage exception:',e);toast('⚠ PDF-Speicher: '+e.message);}
           var row=buildRow(parsed,pdfUrl);
           var upd=await SB.from('kunden').update(row).eq('id',existing.id);
           if(upd.error)throw new Error(upd.error.message);
-          await doLoad();toast('✓ '+parsed.kunde+' aktualisiert');
+          await doLoad();toast('✓ '+parsed.kunde+' aktualisiert'+(pdfUrl?' (mit PDF)':' (ohne PDF)'));
         } else {
           // New record
           var pdfUrl=null;
           try{
             var fname=Date.now()+'_'+files[i].name.replace(/[^a-zA-Z0-9._-]/g,'_');
             var up=await SB.storage.from('vertraege').upload(fname,files[i],{contentType:'application/pdf',upsert:false});
-            if(!up.error)pdfUrl=fname;
-          }catch(e){console.warn('PDF upload failed:',e);}
+            if(up.error){console.error('Storage upload error:',up.error);toast('⚠ PDF-Speicher: '+up.error.message);}
+            else{pdfUrl=fname;console.log('PDF uploaded:',fname);}
+          }catch(e){console.error('Storage exception:',e);toast('⚠ PDF-Speicher: '+e.message);}
           var row=buildRow(parsed,pdfUrl);
           var ins=await SB.from('kunden').insert([row]);
           if(ins.error)throw new Error(ins.error.message);
-          await doLoad();toast('✓ '+parsed.kunde+' hinzugefügt');
+          await doLoad();toast('✓ '+parsed.kunde+' hinzugefügt'+(pdfUrl?' (mit PDF)':' (ohne PDF)'));
         }
       }
     }catch(e){toast('Fehler: '+e.message);}
