@@ -34,3 +34,8 @@
   from = "/api/export"
   to = "/.netlify/functions/export"
   status = 200
+
+[[redirects]]
+  from = "/api/contracts"
+  to = "/.netlify/functions/contracts"
+  status = 200

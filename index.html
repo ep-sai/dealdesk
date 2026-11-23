@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DealDesk</title>
   <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Source+Sans+3:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <script src="https://alcdn.msauth.net/browser/2.38.0/js/msal-browser.min.js" onerror="document.getElementById('login-err').textContent='Fehler: Microsoft Auth konnte nicht geladen werden.'"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
   <style>
@@ -565,8 +564,6 @@
 
 <script>
 /* ── Config ── */
-var SB_URL='https://exsrtfiocqleaqqvcffq.supabase.co';
-var SB_KEY='eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV4c3J0ZmlvY3FsZWFxcXZjZmZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQyOTE1ODQsImV4cCI6MjA4OTg2NzU4NH0.Oy7eEu4bkO9n3U6PbCPhEFOp4BjHXSeDNgVCa6AWSQ8';
 var CLIENT_ID='a917e360-e8fa-4b2c-9c52-4b4f3de30022';
 var TENANT_ID='645a8199-b652-44c7-903a-9f33740ce3dd';
 var REDIRECT='https://sai-dealdesk.netlify.app';
@@ -759,12 +756,49 @@ function initMSAL(){
   }catch(e){gi('login-err').textContent='MSAL Init Fehler: '+e.message;}
 }
 if(typeof msal!=='undefined'){initMSAL();}else{gi('login-err').textContent='Microsoft Auth konnte nicht geladen werden.';}
+/* ── Server-API (Entra-Token, kein direkter DB-Zugriff mehr) ── */
+async function getToken(){
+  if(!msalInst)throw new Error('Nicht angemeldet');
+  var acc=msalInst.getAllAccounts()[0];
+  if(!acc){msalInst.loginRedirect({scopes:['User.Read']});throw new Error('Bitte neu anmelden');}
+  try{var r=await msalInst.acquireTokenSilent({scopes:['User.Read'],account:acc});return r.idToken;}
+  catch(e){msalInst.loginRedirect({scopes:['User.Read']});throw new Error('Sitzung abgelaufen – melde neu an');}
+}
+async function apiFetch(url,opts){
+  opts=opts||{};opts.headers=Object.assign({},opts.headers,{Authorization:'Bearer '+(await getToken())});
+  return fetch(url,opts);
+}
+function makeApi(){
+  async function call(action,payload){
+    try{
+      var r=await apiFetch('/api/contracts',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(Object.assign({action:action},payload||{}))});
+      var j=await r.json().catch(function(){return{};});
+      if(!r.ok)return{data:null,error:{message:j.error||('HTTP '+r.status)}};
+      return{data:j.data,error:null};
+    }catch(e){return{data:null,error:{message:e.message}};}
+  }
+  function b64(file){return new Promise(function(res,rej){var f=new FileReader();f.onload=function(){res(String(f.result).split(',')[1]);};f.onerror=rej;f.readAsDataURL(file);});}
+  return{
+    from:function(){return{
+      select:function(){return{order:function(){return call('list');}};},
+      insert:function(rows){return call('insert',{row:rows[0]});},
+      update:function(row){return{eq:function(c,v){return call('update',{id:v,row:row});}};},
+      delete:function(){return{eq:function(c,v){return call('delete',{id:v});}};}
+    };},
+    storage:{from:function(){return{
+      list:function(){return call('health');},
+      remove:function(paths){return call('remove',{paths:paths});},
+      createSignedUrl:function(path,sec){return call('sign',{path:path,seconds:sec});},
+      upload:async function(name,file){return call('upload',{filename:name,pdf_base64:await b64(file)});}
+    };}}
+  };
+}
 function doMSLogin(){if(!msalInst){gi('login-err').textContent='MSAL nicht initialisiert.';return;}try{msalInst.loginRedirect({scopes:['User.Read']});}catch(e){gi('login-err').textContent='Login Fehler: '+e.message;}}
 function doLogout(){localStorage.removeItem('ms_user');sessionStorage.clear();if(msalInst)msalInst.logoutRedirect();else window.location.reload();}
 function showApp(){
   gi('ls').style.display='none';gi('app').style.display='flex';
   var u=ls('ms_user');if(u){try{var p=JSON.parse(u);gi('uname').textContent=p.name||p.email;var n=(p.name||p.email||'');gi('sb-avatar').textContent=n.split(' ').map(function(w){return w[0];}).join('').toUpperCase().slice(0,2);}catch(e){}}
-  SB=window.supabase.createClient(SB_URL,SB_KEY);
+  SB=makeApi();
   doLoad().then(function(){
     var params=new URLSearchParams(window.location.search);
     var sp=params.get('search');
@@ -843,7 +877,7 @@ async function slackNotifyNew(parsed){
       '• Invest: '+fmtE(invest)+' '+(parsed.invest_rhythmus==='monatlich'?'mtl.':'p.a.')+'\n'+
       '• Leistungen: '+leist+'\n'+
       '🔗 <'+link+'|In DealDesk öffnen>';
-    await fetch('/api/slack',{method:'POST',headers:{'Content-Type':'application/json'},
+    await apiFetch('/api/slack',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({action:'send',channel:ch.id,text:msg})});
   }catch(e){console.error('Slack notify new error:',e);}
 }
@@ -892,7 +926,7 @@ async function autoSlackExpiryCheck(){
       '• Leistungen: '+leist+'\n'+
       '➡️ Bitte Verlängerung besprechen!';
     try{
-      var res=await fetch('/api/slack',{method:'POST',headers:{'Content-Type':'application/json'},
+      var res=await apiFetch('/api/slack',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({action:'send',channel:ch.id,text:msg})});
       if(res.ok){sent++;notified[r.angebotsnr||r.id]=weekKey;}
     }catch(e){console.error('Slack expiry error:',e);}
@@ -1417,7 +1451,7 @@ function toB64(file){return new Promise(function(res,rej){var r=new FileReader()
 async function doExtract(b64){
   var resp;
   try{
-    resp=await fetch('/api/anthropic',{method:'POST',headers:{'Content-Type':'application/json'},
+    resp=await apiFetch('/api/anthropic',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1500,messages:[{role:'user',content:[
         {type:'document',source:{type:'base64',media_type:'application/pdf',data:b64}},
         {type:'text',text:'Du analysierst ein Smile AI Angebotsdokument.\nAntworte NUR mit validem JSON. Kein Markdown.\n\n1. KUNDE: Nach "Angebotsempfaenger:" oder "Angebot fuer:". Nur Firmenname. Niemals "Smile AI GmbH" oder "Dr. Kaske GmbH".\n2. ANGEBOTSNR & DATUM: Nach "Angebotsnummer:" und "Angebotsdatum:". Exakt kopieren.\n3. LEISTUNGEN: Modulnamen 1:1 aus der linken Tabellenspalte. Kategoriezeilen weglassen.\n4. INVEST: Kurz vor/nach "Details:" alle Euro-Betraege. Letzte/kleinste=invest_final. invest_rhythmus: "monatlich" oder "jaehrlich".\n5. LAUFZEIT: Aus "bei X Monaten Laufzeit".\n6. VERTRAGSBEGINN: Aus "Laufzeit des Vertrages beginnt...".\n\n{"kunde":"","angebotsnr":"","angebotsdatum":"","vertragsbeginn":"","laufzeit":"","laufzeit_monate":12,"verlaengerung":"12 Monate","vertragsende_iso":null,"leistungen":[],"invest_brutto":0,"invest_brutto_label":"","invest_rabatt_prozent":null,"invest_final":0,"invest_final_label":"","invest_rhythmus":"jaehrlich","notiz":""}'}
@@ -1571,7 +1605,7 @@ async function chatSend(){
 
     var hist=CHAT_HISTORY.slice(-10);
 
-    var resp=await fetch('/api/anthropic',{method:'POST',headers:{'Content-Type':'application/json'},
+    var resp=await apiFetch('/api/anthropic',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,system:sysPrompt,messages:hist})
     });
     if(!resp.ok){
@@ -1599,7 +1633,7 @@ var SLACK_CHANNELS=null;
 async function loadSlackChannels(){
   if(SLACK_CHANNELS)return SLACK_CHANNELS;
   try{
-    var r=await fetch('/api/slack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'list_channels'})});
+    var r=await apiFetch('/api/slack',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({action:'list_channels'})});
     if(!r.ok)throw new Error('Slack API Fehler '+r.status);
     var j=await r.json();
     SLACK_CHANNELS=j.channels||[];
@@ -1674,7 +1708,7 @@ async function sendSlackAlerts(singleId){
 
   for(var i=0;i<alerts.length;i++){
     try{
-      var r=await fetch('/api/slack',{method:'POST',headers:{'Content-Type':'application/json'},
+      var r=await apiFetch('/api/slack',{method:'POST',headers:{'Content-Type':'application/json'},
         body:JSON.stringify({action:'send',channel:alerts[i].channel.id,text:alerts[i].message})});
       if(r.ok)sent++;
       else{var e=await r.json();console.error('Slack send error:',e);skipped++;}
