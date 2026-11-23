@@ -21,3 +21,16 @@
   from = "/api/slack"
   to = "/.netlify/functions/slack"
   status = 200
+
+[functions."keepalive"]
+  schedule = "0 6 */3 * *"
+
+[[redirects]]
+  from = "/api/ingest"
+  to = "/.netlify/functions/ingest-background"
+  status = 200
+
+[[redirects]]
+  from = "/api/export"
+  to = "/.netlify/functions/export"
+  status = 200
