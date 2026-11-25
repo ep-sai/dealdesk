@@ -27,7 +27,7 @@
 
 [[redirects]]
   from = "/api/ingest"
-  to = "/.netlify/functions/ingest-background"
+  to = "/.netlify/functions/ingest"
   status = 200
 
 [[redirects]]
