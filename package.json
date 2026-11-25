@@ -1,0 +1,15 @@
+{
+  "name": "dealdesk",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/ep-sai/dealdesk.git"
+  },
+  "bugs": {
+    "url": "https://github.com/ep-sai/dealdesk/issues"
+  },
+  "homepage": "https://github.com/ep-sai/dealdesk#readme",
+  "dependencies": {
+    "@netlify/blobs": "^11.1.11"
+  },
+  "private": true
+}
