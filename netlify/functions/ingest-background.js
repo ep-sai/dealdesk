@@ -1,14 +1,18 @@
 // netlify/functions/ingest-background.js
 // Background function (bis 15 Min Laufzeit, antwortet sofort 202).
-// Power Automate sendet die PDF -> Claude-Extraktion -> Smile DealDesk API (/api/v2/dealdesk/ingest).
-// Speichern, Duplikat-Pruefung (per Angebotsnummer) und PDF-Ablage uebernimmt jetzt die Smile-API.
+// Wird von ingest.js mit { blob_key, filename } gestartet: holt das PDF aus Netlify Blobs,
+// macht die Claude-Extraktion und schickt alles an die Smile DealDesk API (/api/v2/dealdesk/ingest).
+// Das PDF wird danach aus Netlify Blobs geloescht (auch bei Fehlern).
+// Kleine PDFs mit { pdf_base64, filename } direkt funktionieren weiterhin (Uebergang).
 // Slack ist bewusst aus: Vertragsdaten sollen den getrennten Speicher nicht verlassen (siehe SBDT-14985).
 //
 // Umgebungsvariablen in Netlify:
-//   WEBHOOK_SECRET           - wie bisher (Header X-Webhook-Secret von Power Automate)
+//   WEBHOOK_SECRET           - wie bisher
 //   ANTHROPIC_KEY            - wie bisher
 //   DEV_DEALDESK_INGEST_KEY  - Key von Goran (als Secret markiert)
 //   DEALDESK_INGEST_URL      - https://dev.api.app.smileai.co/api/v2/dealdesk/ingest
+
+const { getStore, connectLambda } = require("@netlify/blobs");
 
 const PROMPT = `Du analysierst ein Smile AI Angebotsdokument.
 Antworte NUR mit validem JSON. Kein Markdown.
@@ -33,12 +37,28 @@ exports.handler = async (event) => {
 
   let body;
   try { body = JSON.parse(event.body); } catch (e) { return { statusCode: 400, body: "Invalid JSON" }; }
-  const { pdf_base64, filename } = body;
-  if (!pdf_base64) return { statusCode: 400, body: "Missing pdf_base64" };
-  if (filename && !/\.pdf$/i.test(filename)) { console.log("skip non-pdf"); return { statusCode: 200, body: "skipped" }; }
+  const filename = (body.filename || "upload.pdf").trim();
+  if (!/\.pdf$/i.test(filename)) { console.log("skip non-pdf"); return { statusCode: 200, body: "skipped" }; }
 
-  try { await process_(pdf_base64, (filename || "upload.pdf").trim()); }
-  catch (e) { console.error("ingest failed:", e.message); }
+  let store = null;
+  try {
+    let b64 = body.pdf_base64;
+    if (body.blob_key) {
+      connectLambda(event);
+      store = getStore("dealdesk-inbox");
+      const ab = await store.get(body.blob_key, { type: "arrayBuffer" });
+      if (!ab) throw new Error("blob not found " + body.blob_key);
+      b64 = Buffer.from(ab).toString("base64");
+    }
+    if (!b64) throw new Error("missing pdf");
+    await process_(b64, filename);
+  } catch (e) {
+    console.error("ingest failed:", e.message);
+  } finally {
+    if (store && body.blob_key) {
+      try { await store.delete(body.blob_key); } catch (e) { console.error("blob delete failed", body.blob_key); }
+    }
+  }
   return { statusCode: 200, body: "done" };
 };
 
